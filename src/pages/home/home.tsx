@@ -1,17 +1,93 @@
+import { useEffect, useState } from "react";
+import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
+
 import { products } from "../../data/products";
+
 import "./home.css";
+
+interface Usuario {
+  id: string;
+  nome: string;
+  email: string;
+}
 
 function Home() {
   const navigate = useNavigate();
 
-  const savedUser = localStorage.getItem("user");
-  const user = savedUser ? JSON.parse(savedUser) : null;
+  const [user, setUser] = useState<Usuario | null>(null);
+  const [loadingUser, setLoadingUser] = useState(true);
 
-  function handleLogout() {
-    localStorage.removeItem("isLogged");
-    navigate("/login");
+  useEffect(() => {
+    async function loadUser() {
+      try {
+        const response = await fetch(
+          "http://localhost:5000/api/autenticacao/usuário-atual",
+          {
+            method: "GET",
+            credentials: "include",
+          },
+        );
+
+        if (!response.ok) {
+          navigate("/");
+          return;
+        }
+
+        const data: Usuario = await response.json();
+
+        setUser(data);
+      } catch {
+        toast.error("Não foi possível verificar sua sessão.");
+
+        navigate("/");
+      } finally {
+        setLoadingUser(false);
+      }
+    }
+
+    loadUser();
+  }, [navigate]);
+
+  async function handleLogout() {
+    try {
+      const response = await fetch(
+        "http://localhost:5000/api/autenticacao/sair",
+        {
+          method: "POST",
+          credentials: "include",
+        },
+      );
+
+      if (!response.ok) {
+        toast.error("Não foi possível sair da sua conta.");
+        return;
+      }
+
+      toast.success("Você saiu da sua conta. Até logo! ✨");
+
+      navigate("/");
+    } catch {
+      toast.error("Não foi possível conectar ao servidor.");
+    }
   }
+
+  if (loadingUser) {
+    return (
+      <main className="home-page">
+        <div className="home-loading">
+          <span>CARREGANDO RARITYROOM...</span>
+        </div>
+      </main>
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
+
+  const firstName = user.nome.split(" ")[0];
+  const avatarLetter = user.nome.charAt(0).toUpperCase();
 
   return (
     <main className="home-page">
@@ -23,6 +99,7 @@ function Home() {
 
         <div className="home-search">
           <span>⌕</span>
+
           <input
             type="text"
             placeholder="Buscar itens, personagens, coleções..."
@@ -39,11 +116,9 @@ function Home() {
           </button>
 
           <button className="profile-button">
-            <span className="profile-avatar">
-              {user?.name?.charAt(0)?.toUpperCase() || "C"}
-            </span>
+            <span className="profile-avatar">{avatarLetter}</span>
 
-            <span>{user?.name?.split(" ")[0] || "Colecionador"}</span>
+            <span>{firstName}</span>
           </button>
 
           <button className="logout-button" onClick={handleLogout}>
@@ -58,7 +133,7 @@ function Home() {
             <span className="home-eyebrow">✦ ÁREA DO COLECIONADOR</span>
 
             <h1>
-              Olá, <span>{user?.name?.split(" ")[0] || "Colecionador"}</span>.
+              Olá, <span>{firstName}</span>.
             </h1>
 
             <p>
@@ -83,6 +158,7 @@ function Home() {
         <section className="stats-section">
           <div className="stat-card">
             <span className="stat-icon">📦</span>
+
             <div>
               <small>TOTAL DE PEDIDOS</small>
               <strong>4</strong>
@@ -91,6 +167,7 @@ function Home() {
 
           <div className="stat-card">
             <span className="stat-icon">🚚</span>
+
             <div>
               <small>A CAMINHO</small>
               <strong>1</strong>
@@ -99,6 +176,7 @@ function Home() {
 
           <div className="stat-card">
             <span className="stat-icon">♡</span>
+
             <div>
               <small>FAVORITOS</small>
               <strong>8</strong>
@@ -107,6 +185,7 @@ function Home() {
 
           <div className="stat-card">
             <span className="stat-icon">✦</span>
+
             <div>
               <small>COLECIONADOR DESDE</small>
               <strong>2026</strong>

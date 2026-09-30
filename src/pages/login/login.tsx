@@ -1,4 +1,5 @@
 import { useState } from "react";
+import toast from "react-hot-toast";
 import { Link, useNavigate } from "react-router-dom";
 import "./login.css";
 
@@ -13,18 +14,40 @@ interface LoginResponse {
   usuario: Usuario;
 }
 
+interface ErrorResponse {
+  mensagem?: string;
+  errors?: Record<string, string[]>;
+}
+
 function Login() {
   const navigate = useNavigate();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   async function handleLogin(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    setError("");
+    const trimmedEmail = email.trim();
+
+    if (!trimmedEmail) {
+      toast.error("Digite seu e-mail.");
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (!emailRegex.test(trimmedEmail)) {
+      toast.error("Digite um e-mail válido.");
+      return;
+    }
+
+    if (!password) {
+      toast.error("Digite sua senha.");
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -37,27 +60,63 @@ function Login() {
           },
           credentials: "include",
           body: JSON.stringify({
-            email,
+            email: trimmedEmail,
             senha: password,
           }),
         },
       );
 
-      const data: LoginResponse | { mensagem: string } = await response.json();
+      const data: LoginResponse | ErrorResponse | null = await response
+        .json()
+        .catch(() => null);
 
       if (!response.ok) {
-        setError(data.mensagem || "E-mail ou senha inválidos.");
+        const errorData = data as ErrorResponse | null;
+
+        if (response.status === 401) {
+          toast.error(
+            "E-mail ou senha incorretos. Verifique seus dados e tente novamente.",
+          );
+          return;
+        }
+
+        if (response.status === 400) {
+          if (errorData?.errors) {
+            Object.entries(errorData.errors).forEach(([field, messages]) => {
+              messages.forEach((message) => {
+                if (field === "Email") {
+                  toast.error("Digite um e-mail válido.");
+                } else if (field === "Senha") {
+                  toast.error("Digite sua senha.");
+                } else {
+                  toast.error(message);
+                }
+              });
+            });
+          } else {
+            toast.error(
+              errorData?.mensagem || "Verifique os dados preenchidos.",
+            );
+          }
+
+          return;
+        }
+
+        toast.error(
+          errorData?.mensagem || "Não foi possível entrar na sua conta.",
+        );
+
         return;
       }
 
       const loginData = data as LoginResponse;
 
-      localStorage.setItem("user", JSON.stringify(loginData.usuario));
+      toast.success(`Bem-vindo de volta, ${loginData.usuario.nome}! ✨`);
 
       navigate("/home");
     } catch {
-      setError(
-        "Não foi possível conectar ao servidor. Verifique se o backend está rodando.",
+      toast.error(
+        "Não conseguimos conectar ao servidor. Verifique se o backend está rodando.",
       );
     } finally {
       setLoading(false);
@@ -147,7 +206,7 @@ function Login() {
             </p>
           </div>
 
-          <form className="login-form" onSubmit={handleLogin}>
+          <form className="login-form" onSubmit={handleLogin} noValidate>
             <div className="input-group">
               <label htmlFor="email">E-MAIL</label>
 
@@ -161,7 +220,6 @@ function Login() {
                   autoComplete="email"
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
-                  required
                 />
               </div>
             </div>
@@ -169,7 +227,10 @@ function Login() {
             <div className="input-group">
               <div className="password-label">
                 <label htmlFor="password">SENHA</label>
-                <a href="#">Esqueceu a senha?</a>
+
+                <a href="#" onClick={(event) => event.preventDefault()}>
+                  Esqueceu a senha?
+                </a>
               </div>
 
               <div className="input-wrapper">
@@ -182,18 +243,17 @@ function Login() {
                   autoComplete="current-password"
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
-                  required
                 />
               </div>
             </div>
 
             <label className="remember">
               <input type="checkbox" />
+
               <span className="custom-checkbox"></span>
+
               <span>Lembrar de mim</span>
             </label>
-
-            {error && <p className="login-error">{error}</p>}
 
             <button type="submit" className="login-button" disabled={loading}>
               <span>{loading ? "ENTRANDO..." : "ENTRAR NA RARITYROOM"}</span>
