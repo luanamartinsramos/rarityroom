@@ -1,7 +1,17 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-
 import "./login.css";
+
+interface Usuario {
+  id: number;
+  nome: string;
+  email: string;
+}
+
+interface LoginResponse {
+  mensagem: string;
+  usuario: Usuario;
+}
 
 function Login() {
   const navigate = useNavigate();
@@ -9,30 +19,49 @@ function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  function handleLogin(event: React.FormEvent<HTMLFormElement>) {
+  async function handleLogin(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     setError("");
+    setLoading(true);
 
-    // Lógica temporaria enwuanto não conectamos o backend, para simular o login e redirecionar para a página home
-    const savedUser = localStorage.getItem("user");
+    try {
+      const response = await fetch(
+        "http://localhost:5000/api/autenticacao/entrar",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+          body: JSON.stringify({
+            email,
+            senha: password,
+          }),
+        },
+      );
 
-    if (!savedUser) {
-      setError("Nenhuma conta encontrada. Crie sua conta primeiro.");
-      return;
+      const data: LoginResponse | { mensagem: string } = await response.json();
+
+      if (!response.ok) {
+        setError(data.mensagem || "E-mail ou senha inválidos.");
+        return;
+      }
+
+      const loginData = data as LoginResponse;
+
+      localStorage.setItem("user", JSON.stringify(loginData.usuario));
+
+      navigate("/home");
+    } catch {
+      setError(
+        "Não foi possível conectar ao servidor. Verifique se o backend está rodando.",
+      );
+    } finally {
+      setLoading(false);
     }
-
-    const user = JSON.parse(savedUser);
-
-    if (email !== user.email || password !== user.password) {
-      setError("E-mail ou senha incorretos.");
-      return;
-    }
-
-    localStorage.setItem("isLogged", "true");
-
-    navigate("/home");
   }
 
   return (
@@ -166,9 +195,10 @@ function Login() {
 
             {error && <p className="login-error">{error}</p>}
 
-            <button type="submit" className="login-button">
-              <span>ENTRAR NA RARITYROOM</span>
-              <span className="button-arrow">→</span>
+            <button type="submit" className="login-button" disabled={loading}>
+              <span>{loading ? "ENTRANDO..." : "ENTRAR NA RARITYROOM"}</span>
+
+              <span className="button-arrow">{loading ? "..." : "→"}</span>
             </button>
           </form>
 
