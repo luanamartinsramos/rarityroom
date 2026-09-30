@@ -8,11 +8,11 @@ O projeto possui um **frontend desenvolvido em React + TypeScript** e um **backe
 
 # Alunos:
 
-Luana Martins Ramos - 06014936
-Jeorgia Luiza da Rosa Canto - 06014796
-Pedro Henrique Canto da Silva - 06013162
-Lucas Ribeiro Dias - 06015364
-Miguel Souza dos Santos - 06014237
+Luana Martins Ramos - 06014936.
+Jeorgia Luiza da Rosa Canto - 06014796.
+Pedro Henrique Canto da Silva - 06013162.
+Lucas Ribeiro Dias - 06015364.
+Miguel Souza dos Santos - 06014237.
 
 
 ---
