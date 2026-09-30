@@ -1,123 +1,92 @@
 # RarityRoom
 
-Projeto acadêmico de uma plataforma para **compra, venda e descoberta de itens colecionáveis geek**.
+Projeto acadêmico de uma plataforma para **compra, venda e descoberta de
+itens colecionáveis geek**.
 
-## 🛠️ Tecnologias
+O RarityRoom é dividido em **Frontend** e **Backend**, que se comunicam
+através de uma API REST.
+
+---
+
+# 🎨 Frontend
+
+O Frontend foi desenvolvido utilizando **React + TypeScript + Vite**.
+
+Ele é responsável pela interface que o usuário utiliza para acessar a
+plataforma, realizar cadastro e login, visualizar produtos e gerenciar
+seus produtos.
+
+## Tecnologias
 
 - React
 - TypeScript
 - Vite
 - CSS
-- Git e GitHub
+- React Router
+- React Hot Toast
 
-## 📁 Estrutura
+## Funcionalidades
 
-```text
-src/
-├── components/
-├── pages/
-├── App.tsx
-└── main.tsx
-```
+### 🔐 Autenticação
 
-## 🚀 Como executar
+O sistema possui telas para:
 
-Clone o projeto:
+- Cadastro de usuários
+- Login
+- Logout
+- Verificação do usuário autenticado
+- Proteção de páginas que precisam de autenticação
 
-```bash
-git clone URL_DO_REPOSITORIO
-```
+A autenticação é realizada através do Backend utilizando cookies.
 
-Entre na pasta:
+### 🛍️ Produtos
 
-```bash
-cd RarityRoom
-```
+O Frontend permite:
 
-Instale as dependências:
+- Visualizar produtos
+- Cadastrar produtos
+- Editar produtos
+- Excluir produtos
+- Informar preço, estoque, categoria, marca e coleção
+- Adicionar imagem aos produtos
 
-```bash
-npm install
-```
+As operações de produtos são realizadas através da API do Backend.
 
-Execute:
+### 🏠 Home
 
-```bash
-npm run dev
-```
+A página principal apresenta:
 
----
+- Saudação ao usuário
+- Área de cadastro de produtos
+- Produtos cadastrados
+- Informações relacionadas aos pedidos
+- Navegação pela plataforma
 
-# 👥 Git e GitHub
+### 🔔 Notificações
 
-Cada integrante deve trabalhar em uma **branch própria**.
+O projeto utiliza **React Hot Toast** para apresentar mensagens ao usuário,
+como confirmações de ações e avisos de erro.
 
-```text
-main
-├── feature/login
-├── feature/home
-├── feature/cadastro
-└── feature/produtos
-```
 
-## 🌱 Começar uma tarefa
 
-```bash
-git checkout main
-git pull
-git checkout -b feature/nome-da-tarefa
-```
+# 📁 Estrutura do Frontend
 
-Agora faça seu código normalmente.
 
-## 💾 Quando terminar
-
-```bash
-git add .
-git commit -m "feat: descrição da alteração"
-git push -u origin feature/nome-da-tarefa
-```
-
-## 🔀 Pull Request
-
-No GitHub:
-
-```text
-Pull Requests
-→ New Pull Request
-→ main ← feature/nome-da-tarefa
-→ Create Pull Request
-→ Revisão
-→ Merge
-```
-
-## 🔄 Depois do Merge
-
-```bash
-git checkout main
-git pull
-```
-
-## 📌 Resumo
-
-```text
-Criar branch
-    ↓
-Fazer código
-    ↓
-git add .
-    ↓
-git commit
-    ↓
-git push
-    ↓
-Pull Request
-    ↓
-Revisão
-    ↓
-Merge
-    ↓
-git pull
-```
-
-**Regra principal:** não trabalhe diretamente na `main`.
+frontend/
+├── src/
+│   ├── components/
+│   ├── data/
+│   ├── pages/
+│   │   ├── home/
+│   │   ├── login/
+│   │   └── register/
+│   ├── routes/
+│   │   ├── AppRoutes.tsx
+│   │   └── ProtectedRoute.tsx
+│   ├── services/
+│   │   └── produtosService.ts
+│   ├── App.tsx
+│   ├── index.css
+│   └── main.tsx
+├── public/
+└── package.json
