@@ -1,183 +1,112 @@
-# Auditoria final — 40 critérios AV2
+# Auditoria final — 40 itens da rubrica AV2
 
-## Nota sobre a numeração
+Auditoria item a item da rubrica oficial (*Trabalho Prático — AV2, Design e
+Programação Orientados a Objetos*), numerada **A01–G02** como no enunciado.
+Cada linha aponta a evidência no repositório. **Nenhum item é marcado como
+atendido sem evidência verificável**; o que não foi comprovado aparece em
+"Pendências e limitações".
 
-Os critérios estão agrupados conforme a estrutura informada no enunciado da
-AV2: **A** Conceitos de POO (8), **B** Modelo de classes (8), **C** Code review
-(6), **D** Exceções (4), **E** Debugging (6), **F** Testes/rastreabilidade (6),
-**G** Especificação verificável (2) — total 40. A redação de cada linha é uma
-síntese do requisito correspondente; a numeração é desta auditoria e deve ser
-conferida com o documento da disciplina.
+## Ambiente e execução desta auditoria
 
-**Nenhum critério é marcado como atendido sem evidência executada.**
+| Item | Resultado | Evidência |
+|---|---|---|
+| Build do backend (clone limpo) | 0 erros, 0 avisos | `evidencias/clone-limpo.txt` |
+| Testes (clone limpo) | **235 aprovados, 0 falhas** | `evidencias/clone-limpo.txt` |
+| Banco local | criado na 1ª execução; 12 migrações aplicadas | `evidencias/clone-limpo.txt` |
+| Frontend | `npm run build` sem erros | `evidencias/clone-limpo.txt` |
+| SDK | .NET 10.0.404, Node 22 | — |
 
-## Ambiente da auditoria
+## A — Aplicação dos conceitos de POO
 
-| Item | Valor |
-|---|---|
-| SDK | .NET 10.0.401 |
-| Build | `dotnet build` — 0 erros, 0 avisos |
-| Testes | `dotnet test` — 174 aprovados, 0 falhas |
-| API | verificação real por `curl` em `http://localhost:5000` |
-| Frontend | React 19 + Vite em `http://localhost:5173` |
+| Item | Situação | Evidência |
+|---|---|---|
+| A01 — ≥ 5 classes de domínio reais | Atendido | `Usuario`, `Produto`, `Categoria`, `Proposta`, `Favorito`, `Pedido`, `ItemPedido`, `Pagamento`, `ItemCarrinho`, `Avaliacao`, `DadosEntrega` (`backend/Models/`) |
+| A02 — ≥ 2 classes com comportamento próprio | Atendido | `Produto.AplicarOperacao/BaixarEstoque/Reabastecer`; `Pedido.ConfirmarPagamento/CancelarPago`; `Pagamento.VerificarExpiracao/Aprovar` |
+| A03 — ≥ 5 regras distintas usadas no backend | Atendido | RN1–RN5 em `especificacao.md` §3 (+ RC1–RC6 e RA1–RA10) |
+| A04 — fluxo com colaboração entre classes | Atendido | aprovação do pagamento: `Pagamento` + `RegrasCompra` + `Produto` + `Pedido` (`modelo-de-classes.md` §8); aceite de proposta: `Proposta` + `Produto` + `IEstrategiaNegociacao` |
+| A05 — objeto central com ≥ 3 estados e transições | Atendido | `Produto.Estado` (4 estados, tabela `Transicoes`); `Pedido.Estado` (6); `Pagamento.Status` (6) — identidade preservada (mesmo `Id`) |
+| A06 — transição proibida rejeitada sem inconsistência | Atendido | `Reativar_DeReservado_NaoDeveCancelarReserva` (objeto); `TransicaoProibida_ViaApi_EhRejeitadaENaoAlteraOBanco` (dado persistido) |
+| A07 — ≥ 2 regras protegidas por encapsulamento | Atendido | `Produto.Estoque`/`Estado` com *setter* privado, alterados só por métodos que validam; `Pedido.itens` privado + `IReadOnlyList` (`Itens_NaoPodemSerAlteradosDeFora_PreservandoOTotal`); `Pagamento.Status` só por `Aprovar/Recusar/...` |
+| A08 — polimorfismo real usado | Atendido | `IEstrategiaNegociacao` + 3 implementações, escolhidas em `ServicoPropostas.Aceitar`; `Aceitar_MesmaOferta_DeveVariarPorModalidade` |
 
-## Grupo A — Conceitos de POO (8)
+## B — Modelos de classes
 
-| # | Critério | Situação | Evidência |
-|---|---|---|---|
-| A1 | Ao menos cinco classes de domínio relevantes | Atendido | `Usuario`, `Produto`, `Categoria`, `Proposta`, `Favorito` (+3 estratégias) |
-| A2 | Encapsulamento de atributos | Atendido | Todos os `set` são `private`; mutação só por método (ex.: `Produto.AplicarOperacao`) |
-| A3 | Regras de negócio dentro das classes | Atendido | `Produto.ValidarPropriedade`, `Proposta.Transicionar`, `Categoria.GerarSlug` |
-| A4 | Propriedades e métodos coesos | Atendido | `modelo-de-classes.md` §2 |
-| A5 | Construtores garantem invariantes | Atendido | `ProdutoValidacaoTests`, `UsuarioTests`, `CategoriaTests` |
-| A6 | Abstração com propósito | Atendido | `ExcecaoDominio`, `IEstrategiaNegociacao`, `IRepositorio*`, `IServico*` |
-| A7 | Herança só em especialização real | Atendido | Única: `TransicaoInvalidaException : ConflitoException` (acrescenta código próprio) |
-| A8 | Polimorfismo verdadeiro, 2+ implementações usadas | Atendido | 3 estratégias; mesma oferta R$ 200 → recusada em `PrecoFixo` (409) e aceita em `Liquidacao` (200) |
+| Item | Situação | Evidência |
+|---|---|---|
+| B01 — modelo textual com ≥ 5 classes | Atendido | `modelo-de-classes.md` §1 (Mermaid, 15 classes/interfaces) |
+| B02 — ≥ 5 classes correspondem ao C# | Atendido | `modelo-de-classes.md` §6 (tabela classe ↔ arquivo) |
+| B03 — atributos e métodos sem contradição | Atendido | nomes conferidos no código nesta auditoria; omissões deliberadas declaradas em §6 |
+| B04 — associação com multiplicidade implementada | Atendido | `modelo-de-classes.md` §2 (ex.: `Pagamento 1 → 1..* Pedido`, `Usuario 1 → 0..* Produto`) |
+| B05 — composição/ciclo de vida comprovado | Atendido | `Pedido ◆— ItemPedido` (`OwnsMany`, cascade, lista privada) — §3 |
+| B06 — contrato polimórfico no modelo | Atendido | §1 e §4 (`IEstrategiaNegociacao` + 3 implementações) |
+| B07 — invariante e objeto responsável | Atendido | §5 (estoque → `Produto`; total → `Pedido`; transição única → `Pagamento`; venda dupla → `ServicoPedidos` + transação) |
+| B08 — 2 decisões comparando alternativas | Atendido | `decisoes-de-modelagem.md` §A: DA1–DA4 com tabelas de critérios |
 
-## Grupo B — Modelo de classes (8)
+## C — Análise crítica de código
 
-| # | Critério | Situação | Evidência |
-|---|---|---|---|
-| B1 | Classes representam conceitos reais do marketplace | Atendido | anúncio, proposta, favorito, categoria, conta |
-| B2 | Associações e multiplicidades corretas | Atendido | `modelo-de-classes.md` §1 (1 usuário → N anúncios; 1 anúncio → N propostas) |
-| B3 | Separação de responsabilidades entre camadas | Atendido | tabela em `modelo-de-classes.md` §5 |
-| B4 | Colaboração entre objetos | Atendido | fluxo de aceite em 5 passos (`modelo-de-classes.md` §4) |
-| B5 | Estado do anúncio modelado | Atendido | `EstadoAnuncio` + tabela de transições; `ProdutoTransicoesTests` |
-| B6 | Categoria modelada como entidade | Atendido | `Categoria` com `Slug`; `CategoriaTests` |
-| B7 | Negociação modelada | Atendido | `Proposta` + `EstadoProposta`; `PropostaTests` |
-| B8 | Favoritos modelados | Atendido | `Favorito`; `FavoritoTests` |
+| Item | Situação | Evidência |
+|---|---|---|
+| C01 — alteração funcional no Git com diff | Atendido | commit `1b32db1` (`git show 1b32db1`), `code-review.md` §1 |
+| C02 — corresponde a requisito/regra | Atendido | `code-review.md` §2 (RN4, RN5, aprovação no servidor) |
+| C03 — análise dos arquivos e do que está fora do escopo | Atendido | `code-review.md` §3 (4 arquivos; estorno e textos fora do escopo; omissão em `ServicoAdmin`) |
+| C04 — impacto com verificação | Atendido | `code-review.md` §4 (contratos quebrados, dependências 4→9, build em `1b32db1` com 1 erro e em `09d4a32` sem erros) |
+| C05 — ≥ 2 propriedades de POO | Atendido | `code-review.md` §5 (encapsulamento, coesão, acoplamento, responsabilidades) |
+| C06 — decisão fundamentada | Atendido | `code-review.md` §6: corrigir (commit `3a61de9`) e aceitar |
 
-## Grupo C — Code review (6)
+## D — Exceções
 
-| # | Critério | Situação | Evidência |
-|---|---|---|---|
-| C1 | Nomenclatura consistente e significativa | Atendido | domínio em português, métodos com verbo (`ValidarPropriedade`, `RecusarDemaisPendentes`) |
-| C2 | Ausência de duplicação | Atendido | regra de negócio única no domínio; os repositórios em memória saíram da produção e viraram dublês de teste; cada repositório EF implementa apenas a sua consulta |
-| C3 | Métodos curtos e coesos | Atendido | maior método de domínio com ~40 linhas (`AplicarDados`) |
-| C4 | Tratamento de erros consistente | Atendido | `MiddlewareExcecoes` + exceções tipadas |
-| C5 | Legibilidade e comentários úteis | Atendido | comentários explicam o **porquê** (ex.: tabela de transições, D1) |
-| C6 | Aderência aos padrões do projeto | Atendido | namespace, rotas e cookie preservados |
+| Item | Situação | Evidência |
+|---|---|---|
+| D01 — 3 situações, regra × excepcional | Atendido | `excecoes.md` §1 (S1 regra, S2 entrada inválida, S3 excepcional; recusa de cartão como resultado sem exceção) |
+| D02 — caminho de lançamento/propagação/tratamento | Atendido | `excecoes.md` §2 (`Produto.BaixarEstoque` → `UnidadeDeTrabalhoEf` rollback + `throw;` → `MiddlewareExcecoes`) |
+| D03 — falha excepcional sem ocultar nem vazar | Atendido | `MiddlewareExcecoes` (`LogError` + 500 genérico); log real em `evidencias/depuracao/01-…` |
+| D04 — testes das 3 situações | Atendido | `FalhasEInvariantesApiTests` S1, S2, S3 |
 
-## Grupo D — Exceções (4)
+## E — Depuração
 
-| # | Critério | Situação | Evidência |
-|---|---|---|---|
-| D1 | Hierarquia de exceções própria | Atendido | `ExcecaoDominio` + 5 derivadas (`Models/Excecoes/`) |
-| D2 | Exceções específicas em vez de genéricas | Atendido | nenhum `throw new Exception` no domínio; `ServicoAutenticacao` usa `ConflitoException` |
-| D3 | Tratamento centralizado | Atendido | `MiddlewareExcecoes` mapeia 400/403/404/409/500 em um só lugar |
-| D4 | Não expor detalhes internos | Atendido | 500 responde "Ocorreu um erro inesperado"; stack trace só no log |
+| Item | Situação | Evidência |
+|---|---|---|
+| E01 — defeito reproduzível com evidência | Atendido | `debugging.md` §A1; defeito real reintroduzido de forma controlada; `evidencias/depuracao/01-…`, `02-…` |
+| E02 — condições, esperado e observado | Atendido | `debugging.md` §A2; `evidencias/depuracao/reproduzir.sh` |
+| E03 — hipóteses com evidência | Atendido | `debugging.md` §A3 (H1 e H2 descartadas, H3 confirmada) |
+| E04 — técnica de depuração comprovada | Atendido | análise de logs, stack trace e log temporário de diagnóstico com saída salva (`02-…`) |
+| E05 — causa, correção e eliminação | Atendido | `debugging.md` §A5 (`entrega with { }`, commit `1b32db1`) |
+| E06 — antes/depois + comparação de técnicas | Atendido | `debugging.md` §A6; `evidencias/depuracao/03-verificacao-antes-depois.txt` |
 
-## Grupo E — Debugging (6)
+## F — Testes, rastreabilidade e auditoria
 
-| # | Critério | Situação | Evidência |
-|---|---|---|---|
-| E1 | Reprodução do defeito antes da correção | **Parcial** | a causa do id duplicado foi demonstrada por leitura do código e aritmética (`{1,3}` → contagem 2 → id 3 duplicado); o comportamento antigo não foi executado após a reescrita |
-| E2 | Identificação da causa raiz | Atendido | `Count + 1`; ausência de dono no modelo (`debugging.md` Casos 1 e 2) |
-| E3 | Correção na camada correta | Atendido | id no repositório; autorização no domínio |
-| E4 | Evidência objetiva da correção | Atendido | HTTP: id 4 após excluir id 2; 403 para terceiro em PUT/DELETE/PATCH |
-| E5 | Teste de regressão para cada correção | Atendido | `Adicionar_AposExclusao_NaoDeveReutilizarId`, `Atualizar_PorOutroUsuario_DeveNegar` |
-| E6 | Defeito documentado | Atendido | `debugging.md` com 3 casos + 7 episódios de depuração |
+| Item | Situação | Evidência |
+|---|---|---|
+| F01 — sucesso e violação das 5 regras (≥ 10) | Atendido | `especificacao.md` §4: 10 de sucesso + 17 de violação |
+| F02 — violar invariante e estado continuar válido | Atendido | `BaixarEstoque_AcimaDoDisponivel_DeveFalharSemAlterar`, `Itens_NaoPodemSerAlteradosDeFora_PreservandoOTotal` |
+| F03 — integração pela API com regra e persistência | Atendido | `Pix_EstoqueSoBaixaDepoisDaAprovacao`, `TransicaoProibida_ViaApi_EhRejeitadaENaoAlteraOBanco` |
+| F04 — compila e testa a partir de clone limpo | Atendido | `evidencias/clone-limpo.txt` (README §"Como baixar e executar") |
+| F05 — rastreabilidade fluxos ↔ regras ↔ código ↔ testes | Atendido | `especificacao.md` §4 |
+| F06 — auditoria com pendências, sem exageros | Atendido | este documento |
 
-## Grupo F — Testes, rastreabilidade e auditoria (6)
+## G — Especificação verificável e agentes
 
-| # | Critério | Situação | Evidência |
-|---|---|---|---|
-| F1 | Suíte automatizada executável | Atendido | `dotnet test` → 135 aprovados, incluindo 9 de integração HTTP |
-| F2 | Cenários e regras cobertos | Atendido | 14 regras mapeadas em `testes.md` §5 |
-| F3 | Estados e polimorfismo testados | Atendido | `ProdutoTransicoesTests` (12), `EstrategiasTests` (6) |
-| F4 | Rastreabilidade requisito → teste | Atendido | `testes.md` §5 |
-| F5 | Persistência e consistência verificadas | Atendido | SQLite + migração versionada; após reiniciar o servidor, anúncio, usuário, categoria e favorito continuaram no banco |
-| F6 | Auditoria com evidência concreta | Atendido | este documento |
-
-## Grupo G — Especificação verificável e trabalho com agente (2)
-
-| # | Critério | Situação | Evidência |
-|---|---|---|---|
-| G1 | Especificação verificável | Atendido | `requisitos.md` com RF/RN identificados e evidência por linha |
-| G2 | Registro transparente do trabalho com agente | Atendido | `decisoes-de-modelagem.md`, `debugging.md`, `management/cross-session/av2-handoff.md` |
+| Item | Situação | Evidência |
+|---|---|---|
+| G01 — especificação dos 3 fluxos e 5 regras com critérios | Atendido | `especificacao.md` §1–§3 |
+| G02 — especificação para o DsCode + verificação | Atendido, com ressalva | `especificacao-dscode.md` (commit `5d228b8` antes da implementação; execução `3e77f5b`, `54f4775`, `35e8232`; verificação §8). **Ressalva:** a execução foi feita por um agente de código (Claude Code) seguindo a especificação; não há registro de execução dentro da ferramenta DsCode |
 
 ## Resumo
 
-| Situação | Quantidade |
+| Situação | Itens |
 |---|---:|
 | Atendido | 39 |
-| Parcial | 1 (E1) |
-| Pendente | 0 |
-| **Total** | **40** |
+| Atendido com ressalva | 1 (G02) |
+| Não atendido | 0 |
 
-## Pendências declaradas
+## Pendências e limitações (declaradas)
 
-| ID | Pendência | Critério afetado | Ação recomendada |
-|---|---|---|---|
-| P-01 | ~~Repositórios repetem lock + cópia~~ — resolvido: produção usa EF Core; memória só em testes | C2 | — |
-| P-02 | Entidades serializadas direto no JSON | C2 (futuro) | criar DTOs de saída |
-| P-03 | Busca e filtro no cliente | C2 (futuro) | mover para o servidor com paginação |
-| P-04 | ~~Dados só em memória~~ — resolvido com SQLite | F5 | — |
-| P-05 | ~~Sem teste de integração HTTP~~ — resolvido: `FluxoApiTests` com `WebApplicationFactory` | F1/F2 | — |
-| P-06 | Sem upload de imagem | — | armazenamento de arquivos |
-
-## Evidências executadas nesta auditoria
-
-```
-dotnet build   → Compilação com êxito. 0 Aviso(s), 0 Erro(s)
-dotnet test    → Com falha: 0, Aprovado: 104, Total: 104
-GET  /api/categorias              → 200 (7 categorias semeadas)
-GET  /api/produtos (anônimo)      → 200
-POST /api/autenticacao/cadastrar  → 200 (id 1) / 200 (id 2)
-POST /api/autenticacao/cadastrar  → 409 conflito (e-mail repetido)
-POST /api/produtos                → 201 (id 1, modalidade PrecoFixo)
-POST /api/produtos                → 201 (id 2, modalidade Liquidacao)
-PUT  /api/produtos/1 (terceiro)   → 403 acesso-negado
-DELETE /api/produtos/1 (terceiro) → 403 acesso-negado
-PATCH /api/produtos/1/estado      → 403 acesso-negado (terceiro)
-POST /api/produtos (preço 0)      → 400 dados-invalidos
-PATCH /api/produtos/1/estado      → 409 transicao-invalida (vender pausado)
-POST /api/propostas               → 201 (oferta 200 nos dois anúncios)
-POST /api/propostas/1/aceitar     → 409 conflito (PrecoFixo, mínimo 249,90)
-POST /api/propostas/2/aceitar     → 200 (Liquidacao, proposta Aceita)
-GET  /api/produtos/2              → estado Reservado
-POST /api/favoritos/1             → 201
-POST /api/favoritos/1             → 409 conflito (duplicado)
-POST /api/favoritos/1 (dono)      → 400 dados-invalidos (autofavorito)
-DELETE /api/favoritos/1           → 200
-```
-
-## Prova de persistência (SQLite)
-
-Executada parando e subindo o processo do backend:
-
-```
-1. servidor no ar  → cadastro Ana (200), cadastro Bruno (200)
-2.                     criação de anúncio (201), favorito do Bruno (201)
-3. servidor parado (taskkill) — banco em disco: rarityroom.db
-4. servidor subido novamente, com a migração já aplicada
-5. GET /api/produtos    → 1 anúncio: "Funko Batman", 249.9, estado Disponivel
-6. POST /api/autenticacao/entrar (ana@teste.com) → 200 (usuário persistido)
-7. GET /api/favoritos (Bruno)                    → 1 favorito persistido
-8. GET /api/categorias                           → 7 categorias (seed idempotente)
-```
-
-Artefatos: `Dados/RarityRoomContexto.cs` (mapeamento),
-`Dados/Migracoes/20261115024545_Inicial.cs` (5 tabelas),
-`Repositories/Repositorio*Ef.cs` (persistência).
-
-## Prova da Onda 4 (pedido, reputação e imagem)
-
-```
-POST /api/pedidos {produtoId: 2}      → 201, snapshot: nomeProduto "Funko Joker",
-                                        precoUnitario 399.9, estado Pendente
-POST /api/pedidos/1/concluir (comprador) → 403 acesso-negado
-POST /api/pedidos/1/concluir (vendedor)  → 200, estado Concluido
-GET  /api/produtos/2                     → estado Vendido
-POST /api/avaliacoes {pedidoId, nota 5}  → 201
-POST /api/avaliacoes (repetido)          → 409 conflito
-GET  /api/avaliacoes/vendedor/1          → media 5, total 1
-POST /api/produtos/3/imagem (PNG)        → 200, /uploads/{guid}.png
-GET  /uploads/{guid}.png                 → 200 image/png
-POST /api/produtos/3/imagem (text/plain) → 400 dados-invalidos
-POST /api/produtos/3/imagem (terceiro)   → 403 acesso-negado
-```
-
-Módulos novos: `Pedido` (snapshot de nome e preço), `Avaliacao` (nota 1–5 por
-pedido concluído), `ServicoImagensArquivo` (nome gerado pelo servidor), tabelas
-`pedidos` e `avaliacoes`.
+| # | Pendência | Impacto |
+|---|---|---|
+| P1 | `ServicoPedidos` concentra checkout, pagamento simulado e pós-venda (baixa coesão, 9 dependências) — `code-review.md` §5 | manutenção; nenhuma regra quebrada. Ação: extrair `ServicoPagamentos` |
+| P2 | Commits intermediários não foram feitos para compilar isoladamente: a sincronização da versão do zip e a sequência do marketplace foram divididas por camada (modelos, dados, serviços...). Verificado: `1b32db1` tem 1 erro de compilação; `09d4a32` compila | só afeta quem fizer *checkout* de um commit intermediário; o estado final e a `main` compilam e passam nos testes |
+| P3 | `Usuario.TipoConta`, `PodeComprar` e `PodeVender` existem, mas nenhuma regra os usa desde que toda conta compra e vende | código morto declarado; nenhuma regra afirma o contrário |
+| P4 | Expiração de PIX/boleto é verificada sob demanda (ao consultar/pagar), sem processo em segundo plano | compra vencida só muda de estado quando é acessada |
+| P5 | Frontend sem testes automatizados versionados; fluxo verificado em navegador automatizado durante o desenvolvimento | regressões de interface não são barradas pela suíte |
+| P6 | Integração testada só com SQLite; implantação gratuita (Render) tem disco efêmero | dados de demonstração online são apagados quando o serviço reinicia |
+| P7 | Pagamentos são simulados por definição do trabalho (sem gateway); frete não é calculado | escopo acadêmico |

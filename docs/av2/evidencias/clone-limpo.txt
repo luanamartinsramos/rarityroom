@@ -1,0 +1,21 @@
+# Verificação F04 — clone limpo seguindo o README (Linux, .NET SDK 10.0.404, Node 22)
+$ git clone <repositório> <clone> && cd <clone>
+commit: d3a9360
+arquivos .db versionados em backend/: 0
+
+$ cd backend && dotnet restore && dotnet build
+  <clone>/backend/RarityRoom.csproj restaurado (em 314 ms).
+    0 Aviso(s)
+    0 Erro(s)
+
+$ cd tests/RarityRoom.Tests && dotnet test
+Aprovado!  – Com falha:     0, Aprovado:   235, Ignorado:     0, Total:   235, Duração: 1 m 13 s - RarityRoom.Tests.dll (net10.0)
+
+$ cd frontend && npm install && npm run build
+added 197 packages in 2s
+✓ built in 348ms
+
+$ cd backend && dotnet run        # banco preparado automaticamente
+GET /api/categorias -> 200 (15 categorias)
+rarityroom.db criado na primeira execução
+migrações aplicadas: 12 (de 12 em backend/Dados/Migracoes)
