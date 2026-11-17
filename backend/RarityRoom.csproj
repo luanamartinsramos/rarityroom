@@ -7,8 +7,19 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.15">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.15" />
     <PackageReference Include="Microsoft.OpenApi" Version="2.12.2" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="10.2.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Permite que o projeto de testes use a atribuição interna de id
+         (os dublês em memória precisam do mesmo contrato do repositório). -->
+    <InternalsVisibleTo Include="RarityRoom.Tests" />
   </ItemGroup>
 
 </Project>
