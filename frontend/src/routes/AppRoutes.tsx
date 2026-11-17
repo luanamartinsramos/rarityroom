@@ -11,6 +11,11 @@ import ContaPagina from "../pages/conta/conta";
 import PerfilPagina from "../pages/perfil/perfil";
 import RecuperarPagina from "../pages/recuperar/recuperar";
 import NovoAnuncioPagina from "../pages/anuncio/novo";
+import CarrinhoPagina from "../pages/carrinho/carrinho";
+import CheckoutPagina from "../pages/checkout/checkout";
+import PagamentoPagina from "../pages/pagamento/pagamento";
+import PedidosPagina from "../pages/pedidos/pedidos";
+import PedidoDetalhePagina from "../pages/pedidos/pedidoDetalhe";
 
 import ProtectedRoute from "./ProtectedRoute";
 
@@ -93,6 +98,50 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <AdminPagina />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/carrinho"
+        element={
+          <ProtectedRoute>
+            <CarrinhoPagina />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/checkout"
+        element={
+          <ProtectedRoute>
+            <CheckoutPagina />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/pagamento/:id"
+        element={
+          <ProtectedRoute>
+            <PagamentoPagina />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/pedidos"
+        element={
+          <ProtectedRoute>
+            <PedidosPagina />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/pedidos/:id"
+        element={
+          <ProtectedRoute>
+            <PedidoDetalhePagina />
           </ProtectedRoute>
         }
       />
