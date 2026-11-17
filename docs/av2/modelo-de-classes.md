@@ -1,6 +1,15 @@
 # Modelo de classes — RarityRoom
 
-## 1. Visão geral
+Modelo textual (Mermaid) das classes de domínio em `backend/Models/`.
+Atributos e métodos listados são os **relevantes** de cada classe e existem
+com o mesmo nome no código C#; a seção 6 traz a tabela de correspondência
+modelo ↔ código. Persistência: EF Core + SQLite (`backend/Dados/RarityRoomContexto.cs`).
+
+Notação: `+` público, `$` estático, `-` privado. Atributos têm *setter*
+privado no código (`{ get; private set; }`) — só os métodos da própria classe
+os alteram.
+
+## 1. Diagrama
 
 ```mermaid
 classDiagram
@@ -12,8 +21,14 @@ classDiagram
         +string Email
         +string SenhaHash
         +bool Ativo
+        +bool Administrador
+        +AlterarNome(nome)
+        +AlterarEmail(email)
+        +AlterarSenha(senhaHash)
+        +Desativar()
+        +Ativar()
+        +EhProprietario(outroUsuarioId) bool
         +ValidarSenha(senha)$
-        +EhProprietario(id) bool
     }
 
     class Produto {
@@ -22,11 +37,18 @@ classDiagram
         +string Nome
         +decimal Preco
         +int Estoque
+        +string Categoria
         +EstadoAnuncio Estado
         +ModalidadeNegociacao Modalidade
-        +ValidarPropriedade(id)
+        +bool Disponivel
+        -Dictionary Transicoes$
+        +ValidarPropriedade(solicitanteId)
+        +ValidarExclusao(solicitanteId)
         +AplicarOperacao(operacao)
-        +DefinirModalidade(modalidade)
+        +BaixarEstoque(quantidade)
+        +ReporEstoque(quantidade)
+        +Reabastecer(quantidade)
+        +Atualizar(nome, descricao, preco, estoque, ...)
     }
 
     class Categoria {
@@ -45,6 +67,7 @@ classDiagram
         +Aceitar()
         +Recusar()
         +Cancelar()
+        +ValidarProponente(solicitanteId)
     }
 
     class Favorito {
@@ -55,194 +78,226 @@ classDiagram
 
     class IEstrategiaNegociacao {
         <<interface>>
-        +Modalidade Modalidade
-        +ValorMinimo(preco) decimal
-        +Aceita(preco, oferta) bool
+        +ModalidadeNegociacao Modalidade
+        +ValorMinimo(precoAnuncio) decimal
+        +Aceita(precoAnuncio, valorOferta) bool
+    }
+    class EstrategiaPrecoFixo {
+        +ValorMinimo(precoAnuncio) decimal
+        +Aceita(precoAnuncio, valorOferta) bool
+    }
+    class EstrategiaAceitaOferta {
+        +ValorMinimo(precoAnuncio) decimal
+        +Aceita(precoAnuncio, valorOferta) bool
+    }
+    class EstrategiaLiquidacao {
+        +ValorMinimo(precoAnuncio) decimal
+        +Aceita(precoAnuncio, valorOferta) bool
     }
 
-    Usuario "1" --> "0..*" Produto : possui
-    Usuario "1" --> "0..*" Proposta : propõe
-    Usuario "1" --> "0..*" Favorito : favorita
-    Produto "1" --> "0..*" Proposta : recebe
-    Produto "1" --> "0..*" Favorito : é favoritado
-    Produto "1" --> "1" Categoria : pertence
+    class ItemCarrinho {
+        +int Id
+        +int UsuarioId
+        +int ProdutoId
+        +int Quantidade
+        +DefinirQuantidade(quantidade)
+    }
 
-    IEstrategiaNegociacao <|.. EstrategiaPrecoFixo
-    IEstrategiaNegociacao <|.. EstrategiaAceitaOferta
-    IEstrategiaNegociacao <|.. EstrategiaLiquidacao
-```
-
-## 2. Responsabilidades
-
-### `Usuario`
-Representa a conta. Guarda apenas o **hash** da senha, nunca a senha.
-Invariantes: nome 3–120 caracteres; e-mail com formato válido e único;
-hash no formato `salt:hash`.
-
-### `Produto` (anúncio)
-Raiz do agregado de venda. Concentra formação e ciclo de vida.
-Invariantes: dono válido; nome ≥ 3; preço > 0; estoque ≥ 0; categoria
-existente; imagem, se informada, é URL http(s); transições só pelo par
-(origem, operação).
-
-### `Categoria`
-Catálogo de categorias. O **slug** é a identidade semântica: normaliza
-acentos e caixa, então "Colecionáveis" e "colecionaveis" são a mesma
-categoria.
-
-### `Proposta`
-Oferta de compra. Invariantes: valor > 0; estados `Pendente`, `Aceita`,
-`Recusada`, `Cancelada`; apenas `Pendente` transiciona; somente o proponente
-cancela.
-
-### `Favorito`
-Vínculo usuário↔anúncio. Invariante: o dono do anúncio não pode favoritá-lo;
-não há duplicata por par (usuário, anúncio).
-
-### `IEstrategiaNegociacao`
-Contrato de decisão sobre ofertas. Três implementações com regras distintas:
-
-| Implementação | Aceita a partir de | Intenção |
-|---|---|---|
-| `EstrategiaPrecoFixo` | 100% do preço | não negocia |
-| `EstrategiaAceitaOferta` | 85% do preço | negocia com margem |
-| `EstrategiaLiquidacao` | 70% do preço | desova estoque |
-
-## 3. Herança
-
-A única relação de especialização é `TransicaoInvalidaException` herdando de
-`ConflitoException`: a especialização acrescenta um **código** próprio
-(`transicao-invalida`) e permite ao middleware mapear o mesmo status 409 com
-identidade distinta. Não há herança usada apenas para reutilizar código.
-
-## 4. Colaboração entre objetos
-
-```
-Controller → Serviço → Domínio → Repositório
-```
-
-A decisão nunca fica no controller. Exemplo real de colaboração no aceite de
-uma proposta:
-
-1. `ServicoPropostas` busca `Proposta` e `Produto`;
-2. `Produto.ValidarPropriedade` autoriza;
-3. `IEstrategiaNegociacao.Aceita` decide pelo preço e pela modalidade;
-4. `Proposta.Aceitar` e `Produto.Reservar` mudam estado;
-5. `RecusarDemaisPendentes` fecha as outras ofertas.
-
-## 5. Separação de camadas
-
-| Camada | Responsabilidade | Não faz |
-|---|---|---|
-| `Controller` | traduzir HTTP ↔ domínio | regra de negócio |
-| `Services` | orquestrar e autorizar | formatar resposta |
-| `Models` | invariantes e estados | conhecer HTTP |
-| `Repositories` | persistir e gerar id | decidir regra |
-| `Middleware` | traduzir exceção em ProblemDetails | conhecer regra específica |
-
-## 6. Módulos da compra (Onda 4)
-
-```mermaid
-classDiagram
-    direction LR
+    class Pagamento {
+        +int Id
+        +string Codigo
+        +int CompradorId
+        +FormaPagamento Forma
+        +StatusPagamento Status
+        +decimal Valor
+        +int Parcelas
+        +DateTime ExpiraEm
+        +string CartaoFinal
+        +VerificarExpiracao(agora) bool
+        +Aprovar(agora)
+        +Recusar(motivo, agora)
+        +Cancelar(motivo, agora)
+        +Expirar(agora)
+        +RegistrarCartao(final, bandeira, parcelas)
+    }
 
     class Pedido {
         +int Id
-        +int ProdutoId
+        +string Codigo
+        +int? PagamentoId
         +int CompradorId
         +int VendedorId
+        +IReadOnlyList~ItemPedido~ Itens
+        +decimal Total
+        +EstadoPedido Estado
+        +StatusPagamento StatusPagamento
+        -List~ItemPedido~ itens
+        +ConfirmarPagamento(agora)
+        +EncerrarSemPagamento(motivo, agora)
+        +Enviar()
+        +Entregar()
+        +Concluir()
+        +CancelarPago(agora)
+        +Participa(usuarioId) bool
+        +ValidarComprador(solicitanteId)
+        +ValidarVendedor(solicitanteId)
+    }
+
+    class ItemPedido {
+        +int Id
+        +int ProdutoId
         +string NomeProduto
         +decimal PrecoUnitario
-        +EstadoPedido Estado
-        +Concluir()
-        +Cancelar()
-        +ValidarVendedor(id)
+        +int Quantidade
+        +decimal Subtotal
+    }
+
+    class DadosEntrega {
+        <<record>>
+        +string Cep
+        +string Logradouro
+        +string Numero
+        +string Cidade
+        +string Estado
+        +Criar(cep, logradouro, numero, complemento, bairro, cidade, estado)$ DadosEntrega
     }
 
     class Avaliacao {
         +int Id
         +int PedidoId
+        +int ProdutoId
         +int AutorId
         +int VendedorId
         +int Nota
         +string Comentario
     }
 
-    class ReputacaoVendedor {
-        +decimal Media
-        +int Total
-    }
-
-    Pedido "1" --> "0..1" Avaliacao : gera
-    Avaliacao --> ReputacaoVendedor : agrega
+    Usuario "1" --> "0..*" Produto : anuncia (Produto.UsuarioId)
+    Usuario "1" --> "0..*" Proposta : propõe (ProponenteId)
+    Usuario "1" --> "0..*" Favorito : favorita
+    Usuario "1" --> "0..*" ItemCarrinho : carrinho (UsuarioId)
+    Produto "1" --> "0..*" Proposta : recebe
+    Produto "0..*" --> "1" Categoria : pertence (nome canônico)
+    ItemCarrinho "0..*" --> "1" Produto : referencia
+    Pagamento "1" --> "1..*" Pedido : paga (Pedido.PagamentoId)
+    Pedido "1" *-- "1..*" ItemPedido : compõe
+    Pedido "1" *-- "1" DadosEntrega : compõe (snapshot)
+    ItemPedido "0..*" --> "1" Produto : snapshot de
+    Pedido "1" --> "0..*" Avaliacao : avaliado por item
+    Produto ..> IEstrategiaNegociacao : Modalidade escolhe
+    IEstrategiaNegociacao <|.. EstrategiaPrecoFixo
+    IEstrategiaNegociacao <|.. EstrategiaAceitaOferta
+    IEstrategiaNegociacao <|.. EstrategiaLiquidacao
 ```
 
-### `Pedido`
-Fecha o ciclo de compra. Guarda **snapshot** de `NomeProduto` e `PrecoUnitario`:
-editar o anúncio depois não reescreve o histórico. Invariantes: não comprar o
-próprio anúncio; anúncio precisa estar `Disponivel`; só o vendedor conclui;
-apenas `Pendente` transiciona.
+## 2. Associações e multiplicidades (B04)
 
-### `Avaliacao`
-Nota de 1 a 5 do comprador sobre o vendedor. Invariantes: só existe para pedido
-`Concluido`, só o comprador avalia e há no máximo uma por pedido — regra
-reforçada por índice único no banco.
+| Associação | Multiplicidade | Implementação no código |
+|---|---|---|
+| Usuário anuncia Produto | 1 → 0..* | `Produto.UsuarioId` obrigatório (construtor recusa `<= 0`); índice `IX_produtos_UsuarioId` |
+| Pagamento paga Pedido | 1 → 1..* | `Pedido.PagamentoId`; `ServicoPedidos.Finalizar` cria **um pedido por vendedor** para o mesmo pagamento (`GroupBy(UsuarioId)`); nunca 0 pedidos (carrinho vazio é recusado) |
+| Pedido compõe ItemPedido | 1 → 1..* | `Pedido.itens`; o construtor recusa lista vazia (`Construtor_SemItens_DeveFalhar`) e anúncio repetido |
+| Produto recebe Proposta | 1 → 0..* | `Proposta.ProdutoId`; aceitar uma recusa as demais pendentes |
+| Usuário tem ItemCarrinho | 1 → 0..*, no máximo 1 por anúncio | índice único `(UsuarioId, ProdutoId)` em `itens_carrinho`; repetir soma a quantidade |
+| Pedido avaliado | 1 → 0..* (no máximo 1 por item) | índice único `(PedidoId, ProdutoId)` em `avaliacoes` |
 
-### `ReputacaoVendedor`
-Valor derivado: média com duas casas e total de avaliações. Vendedor sem
-avaliação responde `0 / 0`, nunca erro.
+## 3. Composição e dependência de ciclo de vida (B05)
 
-### Upload de imagem
-`ServicoImagensArquivo` grava em `wwwroot/uploads` com nome gerado
-(`Guid`), validando tamanho (2 MB) e tipo declarado. O nome original enviado
-pelo cliente é descartado — o que elimina path traversal e extensão forjada.
+**`Pedido` ◆— `ItemPedido`** é composição legítima:
+- `ItemPedido` não existe sem o pedido: é mapeado com `OwnsMany`
+  (`RarityRoomContexto.ConfigurarPedido`), com chave estrangeira `PedidoId` e
+  `onDelete: Cascade` na migração `CarrinhoPagamentosEItensDoPedido`;
+- só é criado pelo construtor de `Pedido` e não há repositório próprio;
+- a lista é privada (`-itens`); fora do pedido só há leitura
+  (`IReadOnlyList`), comprovado por
+  `Itens_NaoPodemSerAlteradosDeFora_PreservandoOTotal`.
 
-## 7. Comprador, vendedor e checkout
+**`Pedido` ◆— `DadosEntrega`** também: o endereço é `OwnsOne` (colunas
+`Entrega*` na tabela `pedidos`) e cada pedido tem a **própria cópia** — o
+defeito investigado em `debugging.md` aconteceu justamente quando duas
+instâncias de pedido compartilharam o mesmo `DadosEntrega`.
 
-```mermaid
-classDiagram
-    direction LR
+Contraste: `Pedido → Produto` **não** é composição. O pedido guarda um
+*snapshot* (nome, imagem, preço) e o `ProdutoId`; excluir ou editar o anúncio
+não altera o pedido (`Snapshot_NaoMudaQuandoOAnuncioMuda`).
 
-    class Usuario {
-        +TipoConta TipoConta
-        +bool PodeComprar
-        +bool PodeVender
-    }
+## 4. Contrato polimórfico (B06)
 
-    class Pedido {
-        +DadosEntrega Entrega
-        +FormaPagamento FormaPagamento
-        +decimal PrecoUnitario
-    }
+`IEstrategiaNegociacao` (`backend/Models/Negociacao/`) define
+`Modalidade`, `ValorMinimo` e `Aceita`. Três implementações com
+comportamentos diferentes:
 
-    class DadosEntrega {
-        +string Cep
-        +string Logradouro
-        +string Numero
-        +string Complemento
-        +string Bairro
-        +string Cidade
-        +string Estado
-        +Criar() DadosEntrega
-    }
+| Implementação | `Modalidade` | `Aceita` quando |
+|---|---|---|
+| `EstrategiaPrecoFixo` | `PrecoFixo` | oferta ≥ 100% do preço |
+| `EstrategiaAceitaOferta` | `AceitaOferta` | oferta ≥ 85% do preço |
+| `EstrategiaLiquidacao` | `Liquidacao` | oferta ≥ 70% do preço |
 
-    Usuario "1" --> "0..*" Pedido : compra
-    Pedido *-- DadosEntrega : snapshot
-```
+Uso efetivo: as três são registradas no DI (`Program.cs`) e injetadas como
+`IEnumerable<IEstrategiaNegociacao>` em `ServicoPropostas`, que escolhe pela
+`Modalidade` do anúncio em `Aceitar` — sem `if`/`switch` por modalidade.
 
-### `TipoConta`
-Papel escolhido no cadastro: `Comprador`, `Vendedor` ou `Ambos`. Duas derivações
-governam o acesso: `PodeComprar` e `PodeVender`. Contas anteriores à mudança
-foram migradas como `Ambos`, preservando o que já funcionava.
+## 5. Invariantes e objeto responsável (B07)
 
-### `DadosEntrega`
-Value object do checkout. `Criar` valida CEP (8 dígitos, formatado como
-`00000-000`), logradouro, número, bairro, cidade e UF (duas letras). Fica
-gravado no pedido — mudar o cadastro depois não altera compras antigas.
+| Invariante | Objeto responsável | Como é protegida | Teste |
+|---|---|---|---|
+| Estoque nunca negativo; só baixa quantidade ≤ estoque | `Produto` | `BaixarEstoque` valida antes de alterar; `Estoque` com *setter* privado e token de concorrência no EF | `BaixarEstoque_AcimaDoDisponivel_DeveFalharSemAlterar`, `ComprasSimultaneas_DoMesmoEstoque_SoUmaEhAprovada` |
+| Estado do anúncio só muda por transição permitida | `Produto` | tabela privada `Transicoes` + `AplicarOperacao` | `Reativar_DeReservado_NaoDeveCancelarReserva` |
+| `Total` = soma dos subtotais; pedido com ≥ 1 item, sem anúncio repetido | `Pedido` | total calculado no construtor; lista privada exposta só para leitura | `Construtor_DeveGuardarSnapshotDoAnuncio`, `Itens_NaoPodemSerAlteradosDeFora_PreservandoOTotal` |
+| Pagamento sai de "aguardando" uma única vez | `Pagamento` | `GarantirPendente` em `Aprovar/Recusar/Cancelar/Expirar` | `Aprovar_JaRecusado_DeveFalhar` |
+| Estoque de um produto não é vendido duas vezes | `ServicoPedidos` + banco | revalidação dentro de `IUnidadeDeTrabalho` (transação) | `ComprasSimultaneas_DoMesmoEstoque_SoUmaEhAprovada` |
 
-### `FormaPagamento`
-`Pix`, `CartaoCredito` ou `Boleto`, validado por `Enum.IsDefined`.
+A última invariante **ultrapassa uma instância** (envolve vários pedidos
+concorrentes sobre o mesmo anúncio), por isso o responsável é o serviço com a
+transação, e não uma entidade sozinha.
 
-### Regra de papel
-`ServicoAnuncios.Criar` exige `PodeVender`; `ServicoPedidos.Criar` exige
-`PodeComprar`. A autorização é do domínio, não do controller.
+## 6. Correspondência modelo ↔ código (B02/B03)
+
+| Classe do modelo | Arquivo | Conferido |
+|---|---|---|
+| `Usuario` | `backend/Models/Usuario.cs` | atributos e métodos listados existem com estes nomes |
+| `Produto` | `backend/Models/Produto.cs` | idem; `Transicoes` é `private static readonly Dictionary<(EstadoAnuncio, OperacaoAnuncio), EstadoAnuncio>` |
+| `Categoria` | `backend/Models/Categoria.cs` | idem |
+| `Proposta` | `backend/Models/Proposta.cs` | idem |
+| `Favorito` | `backend/Models/Favorito.cs` | idem |
+| `Pedido` | `backend/Models/Pedido.cs` | idem; `itens` privado, `Itens` somente leitura |
+| `ItemPedido` | `backend/Models/ItemPedido.cs` | idem; `Subtotal` calculado |
+| `Pagamento` | `backend/Models/Pagamento.cs` | idem |
+| `ItemCarrinho` | `backend/Models/ItemCarrinho.cs` | idem |
+| `DadosEntrega` | `backend/Models/DadosEntrega.cs` | `record` com `Criar` estático (atributos `Complemento` e `Bairro` omitidos no diagrama por espaço) |
+| `Avaliacao` | `backend/Models/Avaliacao.cs` | idem |
+| `IEstrategiaNegociacao` + 3 | `backend/Models/Negociacao/*.cs` | idem |
+
+Omissões deliberadas (não contradizem o código): atributos descritivos de
+`Produto` (`Descricao`, `Marca`, `Colecao`, `Franquia`, `Raridade`,
+`ImagemUrl`...), datas (`CriadoEm`...), e as propriedades `Usuario.TipoConta`,
+`PodeComprar` e `PodeVender`, que existem mas **não são usadas por nenhuma
+regra** desde que toda conta passou a comprar e vender (ver pendências em
+`auditoria-final.md`).
+
+## 7. Herança e exceções
+
+A única herança de classes concretas é a hierarquia de exceções de domínio
+(`backend/Models/Excecoes/`): `ExcecaoDominio` (abstrata, com `Codigo`) →
+`ValidacaoException`, `AcessoNegadoException`, `NaoEncontradoException`,
+`ConflitoException` → `TransicaoInvalidaException`,
+`PagamentoRecusadoException`. Cada especialização acrescenta um código
+estável usado pelo `MiddlewareExcecoes`; nenhuma herança existe só para
+reaproveitar código.
+
+## 8. Colaboração entre classes no fluxo de compra (A04)
+
+`ServicoPedidos.Aprovar` (pagamento aprovado) coordena objetos com
+responsabilidades diferentes, dentro de uma transação:
+
+1. `Pagamento.VerificarExpiracao` — o pagamento decide se ainda vale;
+2. `RegrasCompra.Problema` — revalida cada item (dono, estado, estoque);
+3. `Produto.BaixarEstoque` — o anúncio protege o próprio estoque e muda para
+   `Vendido` ao zerar;
+4. `Pagamento.Aprovar` e `Pedido.ConfirmarPagamento` — cada um muda o
+   próprio estado;
+5. `IRepositorioCarrinho.RemoverProdutos` — os itens comprados saem do
+   carrinho.
+
+O aceite de proposta (FL2) é a segunda colaboração: `Proposta.Aceitar`,
+`Produto.Reservar` e a `IEstrategiaNegociacao` da modalidade.
