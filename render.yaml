@@ -1,0 +1,12 @@
+# Blueprint do Render: cria o backend (API ASP.NET Core) a partir do Dockerfile.
+# No Render: New → Blueprint → escolha este repositório.
+services:
+  - type: web
+    name: rarityroom-api
+    runtime: docker
+    plan: free
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/categorias
+    autoDeploy: true
