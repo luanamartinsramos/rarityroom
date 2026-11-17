@@ -9,13 +9,21 @@ public interface IServicoPedidos
 
     Pedido ObterPorId(int id, int solicitanteId);
 
-    Pedido Criar(
-        int produtoId,
+    CompraResumo ObterCompra(int pagamentoId, int solicitanteId);
+
+    CompraResumo Finalizar(
+        int compradorId,
         DadosEntrega entrega,
         FormaPagamento formaPagamento,
-        int compradorId);
+        string chaveIdempotencia);
 
-    Pedido Pagar(int id, bool aprovado, int solicitanteId);
+    CompraResumo SimularConfirmacao(int pagamentoId, int solicitanteId);
+
+    CompraResumo PagarComCartao(int pagamentoId, ModeloCartao cartao, int solicitanteId);
+
+    CompraResumo SimularExpiracao(int pagamentoId, int solicitanteId);
+
+    CompraResumo CancelarCompra(int pagamentoId, int solicitanteId);
 
     Pedido Enviar(int id, int solicitanteId);
 

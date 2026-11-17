@@ -32,10 +32,13 @@ public class PedidosController : ControllerBase
     }
 
     /// <summary>
-    /// Checkout: o comprador informa endereço e forma de pagamento.
+    /// Checkout a partir do carrinho do usuário autenticado. Itens, preços e
+    /// quantidades vêm do servidor; o corpo só traz entrega, forma de
+    /// pagamento e a chave da tentativa. Cria a compra "aguardando pagamento"
+    /// sem baixar estoque e sem limpar o carrinho.
     /// </summary>
     [HttpPost]
-    public IActionResult Criar(ModeloPedido modelo)
+    public IActionResult Finalizar(ModeloCheckout modelo)
     {
         var entrega = DadosEntrega.Criar(
             modelo.Cep,
@@ -46,26 +49,13 @@ public class PedidosController : ControllerBase
             modelo.Cidade,
             modelo.Estado);
 
-        var pedido = servicoPedidos.Criar(
-            modelo.ProdutoId,
+        var compra = servicoPedidos.Finalizar(
+            User.ObterUsuarioId(),
             entrega,
             FormaPagamentoDe(modelo.FormaPagamento),
-            User.ObterUsuarioId());
+            modelo.ChaveIdempotencia);
 
-        return StatusCode(StatusCodes.Status201Created, pedido);
-    }
-
-    /// <summary>
-    /// Pagamento demonstrativo. Não há gateway: o resultado é simulado e
-    /// gravado no pedido.
-    /// </summary>
-    [HttpPost("{id:int}/pagar")]
-    public IActionResult Pagar(int id, ModeloPagamento modelo)
-    {
-        return Ok(servicoPedidos.Pagar(
-            id,
-            modelo.Aprovado,
-            User.ObterUsuarioId()));
+        return StatusCode(StatusCodes.Status201Created, compra);
     }
 
     [HttpPost("{id:int}/enviar")]
