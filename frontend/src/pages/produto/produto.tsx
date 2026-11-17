@@ -2,7 +2,9 @@ import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { useNavigate, useParams } from "react-router-dom";
 
-import { adicionarAoCarrinho } from "../../services/carrinhoService";
+import { adicionarComAviso } from "../../services/carrinhoAcoes";
+import { moeda, urlImagem } from "../../utils/formato";
+import { obterMeuId } from "../pedidos/rotulos";
 import { obterProduto, obterVendedor, type VendedorApi } from "../../services/catalogoService";
 import { obterProdutos, type Produto } from "../../services/produtosService";
 import {
@@ -11,6 +13,7 @@ import {
 } from "../../services/avaliacoesService";
 
 import "../shared/paginas.css";
+import "../shared/compra.css";
 
 const API_FAVORITOS = "http://localhost:5000/api/favoritos";
 
@@ -23,6 +26,9 @@ function ProdutoPagina() {
   const [relacionados, setRelacionados] = useState<Produto[]>([]);
   const [avaliacoes, setAvaliacoes] = useState<ResumoAvaliacoes | null>(null);
   const [favoritado, setFavoritado] = useState(false);
+  const [meuId, setMeuId] = useState(0);
+  const [quantidade, setQuantidade] = useState(1);
+  const [adicionando, setAdicionando] = useState(false);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState("");
 
@@ -36,6 +42,9 @@ function ProdutoPagina() {
     }
 
     setCarregando(true);
+    setQuantidade(1);
+
+    obterMeuId().then(setMeuId).catch(() => setMeuId(0));
 
     obterProduto(produtoId)
       .then(async (dados) => {
@@ -89,18 +98,20 @@ function ProdutoPagina() {
     );
   }
 
-  function adicionar() {
-    if (!produto) {
+  /** Mesma ação do catálogo; o servidor valida estoque e anúncio próprio. */
+  async function adicionar(irPara?: string) {
+    if (!produto || adicionando) {
       return;
     }
 
-    try {
-      adicionarAoCarrinho(produto);
-      toast.success("Adicionado ao carrinho! 🛒");
-    } catch (falha) {
-      toast.error(
-        falha instanceof Error ? falha.message : "Não foi possível adicionar.",
-      );
+    setAdicionando(true);
+
+    const ok = await adicionarComAviso(produto, quantidade);
+
+    setAdicionando(false);
+
+    if (ok && irPara) {
+      navigate(irPara);
     }
   }
 
@@ -127,7 +138,7 @@ function ProdutoPagina() {
   return (
     <main className="pagina">
       <div className="pagina-topo">
-        <button onClick={() => navigate("/home")}>← Catálogo</button>
+        <button onClick={() => navigate(-1)}>← Voltar</button>
 
         <h1>{produto.nome}</h1>
       </div>
@@ -135,16 +146,14 @@ function ProdutoPagina() {
       <div className="produto-detalhe">
         <div className="produto-imagem">
           {produto.imagemUrl ? (
-            <img src={produto.imagemUrl} alt={produto.nome} />
+            <img src={urlImagem(produto.imagemUrl)} alt={produto.nome} />
           ) : (
             <span>◇</span>
           )}
         </div>
 
         <div>
-          <div className="produto-preco">
-            R$ {produto.preco.toFixed(2).replace(".", ",")}
-          </div>
+          <div className="produto-preco">{moeda(produto.preco)}</div>
 
           <div className="produto-tags">
             <span className="produto-tag">{produto.categoria}</span>
@@ -156,36 +165,97 @@ function ProdutoPagina() {
             {produto.edicaoLimitada && (
               <span className="produto-tag">Edição limitada</span>
             )}
-            <span className="produto-tag">
-              {produto.estoque} em estoque
-            </span>
+            {produto.marca && <span className="produto-tag">{produto.marca}</span>}
+            {produto.colecao && <span className="produto-tag">{produto.colecao}</span>}
 
             <span className="produto-tag">
               {avaliacoes && avaliacoes.total > 0
                 ? `${avaliacoes.media} ★ (${avaliacoes.total})`
                 : "Sem avaliações"}
             </span>
+
+            {(produto.vendas ?? 0) > 0 && (
+              <span className="produto-tag">{produto.vendas} vendido(s)</span>
+            )}
           </div>
 
           <p className="produto-descricao">
             {produto.descricao || "O vendedor não escreveu uma descrição."}
           </p>
 
-          <div className="produto-acoes">
-            <button
-              className="primario"
-              onClick={adicionar}
-              disabled={produto.estoque <= 0}
-            >
-              {produto.estoque > 0 ? "Adicionar ao carrinho" : "Sem estoque"}
-            </button>
+          <p style={{ color: produto.disponivel ? "#7fe3a6" : "#ff9c9c", margin: "14px 0 0" }}>
+            {produto.disponivel
+              ? `Estoque disponível: ${produto.estoque} unidade(s)`
+              : produto.estado === "Reservado"
+                ? "Reservado por proposta aceita"
+                : produto.estado === "Pausado"
+                  ? "Anúncio pausado pelo vendedor"
+                  : "Esgotado"}
+          </p>
 
-            <button onClick={alternarFavorito}>
-              {favoritado ? "♥ Favoritado" : "♡ Favoritar"}
-            </button>
+          {produto.usuarioId === meuId ? (
+            <div className="produto-acoes">
+              <span className="produto-tag">Este anúncio é seu — gerencie em "Vender".</span>
+              <button onClick={alternarFavorito}>
+                {favoritado ? "♥ Favoritado" : "♡ Favoritar"}
+              </button>
+            </div>
+          ) : (
+            <>
+              {(produto.disponivel || produto.estado === "Reservado") && (
+                <div className="acoes-linha" style={{ alignItems: "center" }}>
+                  <span style={{ color: "#c7bdda", fontSize: 14 }}>Quantidade</span>
+                  <div className="seletor-quantidade">
+                    <button
+                      aria-label="Diminuir quantidade"
+                      disabled={quantidade <= 1}
+                      onClick={() => setQuantidade((atual) => Math.max(1, atual - 1))}
+                    >
+                      −
+                    </button>
+                    <span>{quantidade}</span>
+                    <button
+                      aria-label="Aumentar quantidade"
+                      disabled={quantidade >= produto.estoque}
+                      onClick={() =>
+                        setQuantidade((atual) => Math.min(produto.estoque, atual + 1))
+                      }
+                    >
+                      +
+                    </button>
+                  </div>
+                  <small style={{ color: "#9b8fb0" }}>
+                    Total: {moeda(produto.preco * quantidade)}
+                  </small>
+                </div>
+              )}
 
-            <button onClick={() => navigate("/home")}>Ir ao carrinho</button>
-          </div>
+              <div className="produto-acoes">
+                <button
+                  className="primario"
+                  onClick={() => void adicionar("/checkout")}
+                  disabled={adicionando || !(produto.disponivel || produto.estado === "Reservado")}
+                >
+                  Comprar agora
+                </button>
+
+                <button
+                  onClick={() => void adicionar()}
+                  disabled={adicionando || !(produto.disponivel || produto.estado === "Reservado")}
+                >
+                  {produto.disponivel || produto.estado === "Reservado"
+                    ? "Adicionar ao carrinho"
+                    : "Indisponível"}
+                </button>
+
+                <button onClick={alternarFavorito}>
+                  {favoritado ? "♥ Favoritado" : "♡ Favoritar"}
+                </button>
+
+                <button onClick={() => navigate("/carrinho")}>Ir ao carrinho</button>
+              </div>
+            </>
+          )}
 
           {vendedor && (
             <div
@@ -197,12 +267,16 @@ function ProdutoPagina() {
               </div>
 
               <div>
-                <strong>{vendedor.nome}</strong>
+                <small style={{ color: "#9b8fb0" }}>Vendido por</small>
+                <br />
+                <strong>{vendedor.loja?.nome ?? vendedor.nome}</strong>
 
                 <div>
                   {vendedor.totalAvaliacoes === 0
                     ? "Sem avaliações ainda"
                     : `${vendedor.reputacaoMedia} ★ (${vendedor.totalAvaliacoes})`}
+                  {" · "}
+                  {vendedor.produtosVendidos} anúncio(s) vendido(s)
                 </div>
               </div>
             </div>
@@ -245,7 +319,7 @@ function ProdutoPagina() {
               >
                 <div className="cartao-produto-imagem">
                   {item.imagemUrl ? (
-                    <img src={item.imagemUrl} alt={item.nome} />
+                    <img src={urlImagem(item.imagemUrl)} alt={item.nome} />
                   ) : (
                     <span>◇</span>
                   )}
@@ -253,7 +327,7 @@ function ProdutoPagina() {
 
                 <div className="cartao-produto-info">
                   <strong>{item.nome}</strong>
-                  <span>R$ {item.preco.toFixed(2).replace(".", ",")}</span>
+                  <span>{moeda(item.preco)}</span>
                 </div>
               </article>
             ))}
