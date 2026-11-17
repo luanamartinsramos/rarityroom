@@ -1,9 +1,19 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
 
-import type { Produto } from "../../services/produtosService";
-import { obterProdutos } from "../../services/produtosService";
+import {
+  obterCategorias,
+  type Produto,
+  obterProdutos,
+  type FiltroProdutos,
+} from "../../services/produtosService";
+import {
+  criarPedido,
+  obterPedidos,
+  type PedidoApi,
+} from "../../services/pedidosService";
+import { obterNotificacoes } from "../../services/notificacoesService";
 
 import "./home.css";
 
@@ -11,6 +21,8 @@ interface Usuario {
   id: string;
   nome: string;
   email: string;
+  tipoConta?: string;
+  administrador?: boolean;
 }
 
 interface ProdutoForm {
@@ -38,38 +50,43 @@ interface Pedido {
   data: string;
 }
 
-const categorias = [
-  {
-    nome: "Games",
-    descricao: "Jogos e acessórios",
-    icon: "🎮",
-    classe: "category-purple",
-  },
-  {
-    nome: "Heróis",
-    descricao: "Marvel, DC e muito mais",
-    icon: "🦸",
-    classe: "category-gold",
-  },
-  {
-    nome: "Fantasia",
-    descricao: "Magia e aventuras",
-    icon: "🧙",
-    classe: "category-blue",
-  },
-  {
-    nome: "Anime",
-    descricao: "Itens exclusivos",
-    icon: "👾",
-    classe: "category-red",
-  },
-  {
-    nome: "Figures",
-    descricao: "Bonecos e estátuas",
-    icon: "🧸",
-    classe: "category-pink",
-  },
+// Paleta visual aplicada às categorias vindas do catálogo do backend.
+const paletaCategorias = [
+  { descricao: "Jogos e acessórios", icon: "🎮", classe: "category-purple" },
+  { descricao: "Heróis e quadrinhos", icon: "🦸", classe: "category-gold" },
+  { descricao: "Itens colecionáveis", icon: "✨", classe: "category-blue" },
+  { descricao: "Animes e mangás", icon: "👾", classe: "category-red" },
+  { descricao: "Bonecos e estátuas", icon: "🧸", classe: "category-pink" },
 ];
+
+function mapearPedido(pedido: PedidoApi): Pedido {
+  const status =
+    pedido.estado === "Concluido"
+      ? "Concluído"
+      : pedido.estado === "Cancelado"
+        ? "Cancelado"
+        : "Pedido realizado";
+
+  return {
+    id: "RR-" + String(pedido.id).padStart(5, "0"),
+    produto: pedido.nomeProduto,
+    quantidade: 1,
+    total: pedido.precoUnitario,
+    status,
+    data: new Date(pedido.criadoEm).toLocaleDateString("pt-BR"),
+  };
+}
+
+const emptyCheckout = {
+  cep: "",
+  logradouro: "",
+  numero: "",
+  complemento: "",
+  bairro: "",
+  cidade: "",
+  estado: "",
+  formaPagamento: "Pix",
+};
 
 const emptyForm: ProdutoForm = {
   nome: "",
@@ -95,13 +112,24 @@ function Home() {
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("Todos");
 
+  const [categorias, setCategorias] = useState<
+    { nome: string; descricao: string; icon: string; classe: string }[]
+  >([]);
+
+  const [ordem, setOrdem] = useState("Relevancia");
+  const [precoMin, setPrecoMin] = useState("");
+  const [precoMax, setPrecoMax] = useState("");
+  const [somenteDestaque, setSomenteDestaque] = useState(false);
+
+  const [searchResults, setSearchResults] = useState<Produto[]>([]);
+  const [searching, setSearching] = useState(false);
+
   const [favorites, setFavorites] = useState<number[]>([]);
   const [cart, setCart] = useState<CarrinhoItem[]>([]);
 
   const [showCart, setShowCart] = useState(false);
   const [showFavorites, setShowFavorites] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
-  const [showOrders, setShowOrders] = useState(false);
 
   const [selectedProduct, setSelectedProduct] = useState<Produto | null>(null);
 
@@ -112,16 +140,15 @@ function Home() {
 
   const [savingProduct, setSavingProduct] = useState(false);
 
-  const [orders, setOrders] = useState<Pedido[]>([
-    {
-      id: "RR-2026-00124",
-      produto: "Pedido em andamento",
-      quantidade: 1,
-      total: 349.9,
-      status: "Em transporte",
-      data: "28 de setembro",
-    },
-  ]);
+  const [orders, setOrders] = useState<Pedido[]>([]);
+
+  const [showSeller, setShowSeller] = useState(false);
+
+  const [naoLidas, setNaoLidas] = useState(0);
+
+  const [showCheckout, setShowCheckout] = useState(false);
+  const [checkoutForm, setCheckoutForm] = useState(emptyCheckout);
+  const [enviandoPedido, setEnviandoPedido] = useState(false);
 
   useEffect(() => {
     async function loadUser() {
@@ -159,6 +186,7 @@ function Home() {
       const data = await obterProdutos();
 
       setProducts(data);
+      setSearchResults(data);
     } catch {
       toast.error("Não foi possível carregar os produtos.");
     } finally {
@@ -193,13 +221,11 @@ function Home() {
   }
 
   function scrollToProducts() {
-    setShowOrders(false);
 
     document.getElementById("products")?.scrollIntoView({ behavior: "smooth" });
   }
 
   function scrollToOrders() {
-    setShowOrders(true);
 
     setTimeout(() => {
       document.getElementById("orders")?.scrollIntoView({ behavior: "smooth" });
@@ -265,12 +291,6 @@ function Home() {
           : item,
       ),
     );
-  }
-
-  function openCreateProduct() {
-    setEditingProduct(null);
-    setProductForm(emptyForm);
-    setShowProductForm(true);
   }
 
   function openEditProduct(product: Produto) {
@@ -408,24 +428,125 @@ function Home() {
     }
   }
 
-  const filteredProducts = useMemo(() => {
-    return products.filter((product) => {
-      const searchValue = search.toLowerCase().trim();
+  // Pesquisa no servidor, com espera curta para não disparar a cada tecla.
+  useEffect(() => {
+    const temporizador = setTimeout(() => {
+      setSearching(true);
 
-      const matchesSearch =
-        !searchValue ||
-        product.nome.toLowerCase().includes(searchValue) ||
-        product.categoria.toLowerCase().includes(searchValue) ||
-        product.marca.toLowerCase().includes(searchValue) ||
-        product.colecao.toLowerCase().includes(searchValue);
+      const filtro: FiltroProdutos = { termo: search, ordem };
 
-      const matchesCategory =
-        selectedCategory === "Todos" ||
-        product.categoria.toLowerCase() === selectedCategory.toLowerCase();
+      if (selectedCategory !== "Todos") {
+        filtro.categoria = selectedCategory;
+      }
 
-      return matchesSearch && matchesCategory;
-    });
-  }, [products, search, selectedCategory]);
+      if (precoMin.trim().length > 0) {
+        filtro.precoMin = Number(precoMin.replace(",", "."));
+      }
+
+      if (precoMax.trim().length > 0) {
+        filtro.precoMax = Number(precoMax.replace(",", "."));
+      }
+
+      if (somenteDestaque) {
+        filtro.destaque = true;
+      }
+
+      obterProdutos(filtro)
+        .then(setSearchResults)
+        .catch(() => toast.error("Não foi possível pesquisar."))
+        .finally(() => setSearching(false));
+    }, 300);
+
+    return () => clearTimeout(temporizador);
+  }, [search, selectedCategory, ordem, precoMin, precoMax, somenteDestaque, products]);
+
+  // Categorias vêm do catálogo do backend, não de uma lista fixa.
+  useEffect(() => {
+    obterCategorias()
+      .then((lista) =>
+        setCategorias(
+          lista.map((categoria, indice) => ({
+            nome: categoria.nome,
+            ...paletaCategorias[indice % paletaCategorias.length],
+          })),
+        ),
+      )
+      .catch(() => setCategorias([]));
+  }, []);
+
+  // Contador de notificações não lidas no cabeçalho.
+  useEffect(() => {
+    if (!user) {
+      setNaoLidas(0);
+      return;
+    }
+
+    obterNotificacoes()
+      .then((central) => setNaoLidas(central.naoLidas))
+      .catch(() => setNaoLidas(0));
+  }, [user]);
+
+  // Pedidos vêm do servidor: conta nova não tem nenhum.
+  useEffect(() => {
+    if (!user) {
+      setOrders([]);
+      return;
+    }
+
+    obterPedidos()
+      .then((lista) => setOrders(lista.map(mapearPedido)))
+      .catch(() => setOrders([]));
+  }, [user]);
+
+  async function finalizarPedido() {
+    if (cart.length === 0 || enviandoPedido) {
+      return;
+    }
+
+    setEnviandoPedido(true);
+
+    try {
+      for (const item of cart) {
+        await criarPedido({
+          produtoId: item.id,
+          cep: checkoutForm.cep,
+          logradouro: checkoutForm.logradouro,
+          numero: checkoutForm.numero,
+          complemento: checkoutForm.complemento,
+          bairro: checkoutForm.bairro,
+          cidade: checkoutForm.cidade,
+          estado: checkoutForm.estado,
+          formaPagamento: checkoutForm.formaPagamento,
+        });
+      }
+
+      const atualizados = await obterPedidos();
+
+      setOrders(atualizados.map(mapearPedido));
+      setCart([]);
+      setCheckoutForm(emptyCheckout);
+      setShowCheckout(false);
+      setShowCart(false);
+
+      toast.success("Pedido criado com sucesso! ✨");
+
+      setTimeout(() => {
+        scrollToOrders();
+      }, 100);
+    } catch (erro) {
+      toast.error(
+        erro instanceof Error
+          ? erro.message
+          : "Não foi possível concluir o pedido.",
+      );
+    } finally {
+      setEnviandoPedido(false);
+    }
+  }
+
+  const meusProdutos = products.filter(
+    (product) => String(product.usuarioId) === user?.id,
+  );
 
   const favoriteProducts = products.filter((product) =>
     favorites.includes(product.id),
@@ -468,7 +589,8 @@ function Home() {
           RARITYROOM
         </button>
 
-        <div className="home-search">
+        <div className="home-search-area">
+          <div className="home-search">
           <span>⌕</span>
 
           <input
@@ -477,9 +599,69 @@ function Home() {
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
+          </div>
+
+          <div className="home-search-filtros">
+            <select
+              className="toolbar-select"
+              value={ordem}
+              onChange={(event) => setOrdem(event.target.value)}
+            >
+              <option value="Relevancia">Relevância</option>
+              <option value="MenorPreco">Menor preço</option>
+              <option value="MaiorPreco">Maior preço</option>
+              <option value="Novidades">Novidades</option>
+            </select>
+
+            <input
+              className="toolbar-preco"
+              placeholder="Preço mín."
+              value={precoMin}
+              onChange={(event) => setPrecoMin(event.target.value)}
+            />
+
+            <input
+              className="toolbar-preco"
+              placeholder="Preço máx."
+              value={precoMax}
+              onChange={(event) => setPrecoMax(event.target.value)}
+            />
+
+            <button
+              className={somenteDestaque ? "active" : ""}
+              onClick={() => setSomenteDestaque((atual) => !atual)}
+            >
+              ★ Destaques
+            </button>
+          </div>
         </div>
 
         <div className="home-nav-actions">
+          {user?.administrador && (
+            <button
+              className="nav-button"
+              onClick={() => navigate("/admin")}
+            >
+              ⚙️ <span>Admin</span>
+            </button>
+          )}
+
+          <button className="nav-button" onClick={() => navigate("/conta")}>
+            👤 <span>Minha conta</span>
+          </button>
+
+          <button
+            className="nav-button"
+            onClick={() => navigate("/notificacoes")}
+          >
+            🔔 <span>Notificações</span>
+            {naoLidas > 0 && <strong>{naoLidas}</strong>}
+          </button>
+
+          <button className="nav-button" onClick={() => setShowSeller(true)}>
+            🏪 <span>Vender</span>
+          </button>
+
           <button className="nav-button" onClick={() => setShowFavorites(true)}>
             ♡ <span>Favoritos</span>
             {favorites.length > 0 && <strong>{favorites.length}</strong>}
@@ -756,12 +938,10 @@ function Home() {
               <h2>Cadastre seus itens no catálogo</h2>
             </div>
 
-            <div className="product-actions">
-              <button onClick={openCreateProduct}>+ Cadastrar produto</button>
-            </div>
           </div>
 
           <div className="product-toolbar">
+
             <button
               className={selectedCategory === "Todos" ? "active" : ""}
               onClick={() => setSelectedCategory("Todos")}
@@ -781,20 +961,23 @@ function Home() {
           </div>
 
           <div className="products-grid">
-            {loadingProducts ? (
+            {loadingProducts || searching ? (
               <div className="products-loading">Carregando produtos...</div>
-            ) : filteredProducts.length === 0 ? (
+            ) : searchResults.length === 0 ? (
               <div className="products-empty">
                 <span>◇</span>
                 <h3>Nenhum produto encontrado</h3>
                 <p>Tente outra busca ou cadastre um novo produto.</p>
 
-                <button className="primary-button" onClick={openCreateProduct}>
+                <button
+                  className="primary-button"
+                  onClick={() => navigate("/anuncios/novo")}
+                >
                   Cadastrar produto
                 </button>
               </div>
             ) : (
-              filteredProducts.map((product) => (
+              searchResults.map((product) => (
                 <article className="product-card" key={product.id}>
                   <div
                     className="product-cover"
@@ -941,25 +1124,8 @@ function Home() {
                         return;
                       }
 
-                      const newOrder: Pedido = {
-                        id: `RR-2026-${String(orders.length + 125).padStart(
-                          5,
-                          "0",
-                        )}`,
-                        produto:
-                          cart.length === 1
-                            ? cart[0].nome
-                            : `${cart.length} produtos`,
-                        quantidade: cartQuantity,
-                        total: cartTotal,
-                        status: "Pedido realizado",
-                        data: "Aguardando confirmação",
-                      };
-
-                      setOrders((current) => [newOrder, ...current]);
-
-                      setCart([]);
                       setShowCart(false);
+                      setShowCheckout(true);
 
                       toast.success("Pedido criado com sucesso! ✨");
 
@@ -973,6 +1139,223 @@ function Home() {
                 </div>
               </>
             )}
+          </aside>
+        </div>
+      )}
+
+      {showSeller && (
+        <div className="modal-overlay" onClick={() => setShowSeller(false)}>
+          <aside
+            className="side-panel"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="panel-header">
+              <div>
+                <span>ÁREA DO VENDEDOR</span>
+                <h2>Meus anúncios</h2>
+              </div>
+
+              <button onClick={() => setShowSeller(false)}>×</button>
+            </div>
+
+            <div className="seller-actions">
+              <button
+                className="primary-button"
+                onClick={() => navigate("/anuncios/novo")}
+              >
+                + Cadastrar produto
+              </button>
+            </div>
+
+            {meusProdutos.length === 0 ? (
+              <div className="panel-empty">
+                <span>◇</span>
+                <h3>Você ainda não publicou nada</h3>
+                <p>Cadastre seu primeiro item para começar a vender.</p>
+              </div>
+            ) : (
+              <div className="seller-list">
+                {meusProdutos.map((produto) => (
+                  <div className="seller-item" key={produto.id}>
+                    <div>
+                      <strong>{produto.nome}</strong>
+
+                      <span>
+                        R$ {produto.preco.toFixed(2).replace(".", ",")} ·{" "}
+                        {produto.estado}
+                      </span>
+
+                      <span>Estoque: {produto.estoque}</span>
+                    </div>
+
+                    <div className="seller-item-actions">
+                      <button onClick={() => openEditProduct(produto)}>
+                        Editar
+                      </button>
+
+                      <button onClick={() => handleDeleteProduct(produto.id)}>
+                        Excluir
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </aside>
+        </div>
+      )}
+
+      {showCheckout && (
+        <div className="modal-overlay" onClick={() => setShowCheckout(false)}>
+          <aside
+            className="side-panel"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="panel-header">
+              <div>
+                <span>CHECKOUT</span>
+                <h2>Entrega e pagamento</h2>
+              </div>
+
+              <button onClick={() => setShowCheckout(false)}>×</button>
+            </div>
+
+            <form
+              className="checkout-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void finalizarPedido();
+              }}
+            >
+              <div className="checkout-grid">
+                <label>
+                  CEP
+                  <input
+                    value={checkoutForm.cep}
+                    placeholder="00000-000"
+                    onChange={(event) =>
+                      setCheckoutForm({ ...checkoutForm, cep: event.target.value })
+                    }
+                    required
+                  />
+                </label>
+
+                <label>
+                  Número
+                  <input
+                    value={checkoutForm.numero}
+                    onChange={(event) =>
+                      setCheckoutForm({
+                        ...checkoutForm,
+                        numero: event.target.value,
+                      })
+                    }
+                    required
+                  />
+                </label>
+
+                <label className="wide">
+                  Logradouro
+                  <input
+                    value={checkoutForm.logradouro}
+                    onChange={(event) =>
+                      setCheckoutForm({
+                        ...checkoutForm,
+                        logradouro: event.target.value,
+                      })
+                    }
+                    required
+                  />
+                </label>
+
+                <label className="wide">
+                  Complemento
+                  <input
+                    value={checkoutForm.complemento}
+                    onChange={(event) =>
+                      setCheckoutForm({
+                        ...checkoutForm,
+                        complemento: event.target.value,
+                      })
+                    }
+                  />
+                </label>
+
+                <label>
+                  Bairro
+                  <input
+                    value={checkoutForm.bairro}
+                    onChange={(event) =>
+                      setCheckoutForm({
+                        ...checkoutForm,
+                        bairro: event.target.value,
+                      })
+                    }
+                    required
+                  />
+                </label>
+
+                <label>
+                  Cidade
+                  <input
+                    value={checkoutForm.cidade}
+                    onChange={(event) =>
+                      setCheckoutForm({
+                        ...checkoutForm,
+                        cidade: event.target.value,
+                      })
+                    }
+                    required
+                  />
+                </label>
+
+                <label>
+                  Estado (UF)
+                  <input
+                    value={checkoutForm.estado}
+                    maxLength={2}
+                    onChange={(event) =>
+                      setCheckoutForm({
+                        ...checkoutForm,
+                        estado: event.target.value,
+                      })
+                    }
+                    required
+                  />
+                </label>
+
+                <label>
+                  Forma de pagamento
+                  <select
+                    value={checkoutForm.formaPagamento}
+                    onChange={(event) =>
+                      setCheckoutForm({
+                        ...checkoutForm,
+                        formaPagamento: event.target.value,
+                      })
+                    }
+                  >
+                    <option value="Pix">Pix</option>
+                    <option value="CartaoCredito">Cartão de crédito</option>
+                    <option value="Boleto">Boleto</option>
+                  </select>
+                </label>
+              </div>
+
+              <div className="checkout-total">
+                <span>Total</span>
+
+                <strong>R$ {cartTotal.toFixed(2).replace(".", ",")}</strong>
+              </div>
+
+              <button
+                className="primary-button"
+                type="submit"
+                disabled={enviandoPedido}
+              >
+                {enviandoPedido ? "Processando..." : "Confirmar pedido"}
+              </button>
+            </form>
           </aside>
         </div>
       )}
@@ -1059,6 +1442,18 @@ function Home() {
               <span>{selectedProduct.categoria}</span>
 
               <h2>{selectedProduct.nome}</h2>
+
+              <button
+                className="primary-button"
+                style={{ marginBottom: 12 }}
+                onClick={() => {
+                  const produtoId = selectedProduct.id;
+                  setSelectedProduct(null);
+                  navigate(`/produto/${produtoId}`);
+                }}
+              >
+                Ver página do produto
+              </button>
 
               <p>
                 {selectedProduct.descricao ||
