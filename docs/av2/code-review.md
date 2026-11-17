@@ -7,7 +7,7 @@
 | Commit | `1b32db1` — *feat(pedidos): checkout a partir do carrinho e pagamento simulado com revalidação de estoque* |
 | Branch / PR | `marketplace-completo`, PR #1 (incorporado à `main` com *merge commit*, preservando o hash) |
 | Como ver o diff | `git show 1b32db1` ou `git diff 1b32db1^ 1b32db1` |
-| Ponto de comparação | `1b32db1^` = `ba564d2` (*feat(pagamento): validação do cartão simulado (Luhn, validade, CVV, CPF, parcelas)*) — versão em que o pedido era de um único anúncio e o cliente informava se o pagamento era aprovado |
+| Ponto de comparação | `1b32db1^` = `ba564d2` (*feat(pagamento): validação do cartão simulado (Luhn, validade, CVV, CPF, parcelas)*) — versão em que `PedidosController`/`ServicoPedidos` criavam o pedido de um único anúncio e o cliente informava se o pagamento era aprovado |
 
 ```
 backend/Controller/PagamentosController.cs |  60 ++++
