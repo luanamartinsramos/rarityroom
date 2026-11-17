@@ -198,7 +198,7 @@ cd tests/RarityRoom.Tests
 dotnet test
 ```
 
-Resultado esperado: **222 testes aprovados, 0 falhas**. A suíte
+Resultado esperado: **235 testes aprovados, 0 falhas** (detalhes em `docs/av2/testes.md`). A suíte
 `Api/MarketplaceApiTests.cs` cobre, pela API HTTP real, pesquisa, as 7
 ordenações, carrinho e limites de estoque, checkout, PIX/boleto/cartão
 simulados, cancelamento, expiração, compras simultâneas do mesmo estoque,
