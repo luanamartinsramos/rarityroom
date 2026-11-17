@@ -1,3 +1,4 @@
+import { API_ORIGIN } from "../config";
 export interface EnderecoApi {
   id: number;
   usuarioId: number;
@@ -22,7 +23,7 @@ export interface EnderecoForm {
   estado: string;
 }
 
-const API = "http://localhost:5000/api/enderecos";
+const API = `${API_ORIGIN}/api/enderecos`;
 
 export async function obterEnderecos(): Promise<EnderecoApi[]> {
   const resposta = await fetch(API, { credentials: "include" });

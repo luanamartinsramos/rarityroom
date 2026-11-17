@@ -1,5 +1,6 @@
 import type { PedidoApi } from "./pedidosService";
 import type { Produto } from "./produtosService";
+import { API_ORIGIN } from "../config";
 
 export interface ResumoAdmin {
   usuarios: number;
@@ -20,7 +21,7 @@ export interface UsuarioAdmin {
   criadoEm: string;
 }
 
-const API = "http://localhost:5000/api/admin";
+const API = `${API_ORIGIN}/api/admin`;
 
 async function pedir<T>(caminho: string, init?: RequestInit): Promise<T> {
   const resposta = await fetch(`${API}${caminho}`, {

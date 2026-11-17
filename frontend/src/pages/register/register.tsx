@@ -2,6 +2,7 @@ import { useState } from "react";
 import toast from "react-hot-toast";
 import { Link, useNavigate } from "react-router-dom";
 import "./register.css";
+import { API_ORIGIN } from "../../config";
 
 interface CadastroResponse {
   mensagem: string;
@@ -94,7 +95,7 @@ function Register() {
 
     try {
       const response = await fetch(
-        "http://localhost:5000/api/autenticacao/cadastrar",
+        `${API_ORIGIN}/api/autenticacao/cadastrar`,
         {
           method: "POST",
           headers: {

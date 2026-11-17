@@ -2,6 +2,7 @@ import { useState } from "react";
 import toast from "react-hot-toast";
 import { Link, useNavigate } from "react-router-dom";
 import "./login.css";
+import { API_ORIGIN } from "../../config";
 
 interface Usuario {
   id: number;
@@ -52,7 +53,7 @@ function Login() {
 
     try {
       const response = await fetch(
-        "http://localhost:5000/api/autenticacao/entrar",
+        `${API_ORIGIN}/api/autenticacao/entrar`,
         {
           method: "POST",
           headers: {

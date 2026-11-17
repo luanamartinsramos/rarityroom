@@ -1,3 +1,4 @@
+import { API_ORIGIN } from "../config";
 export interface PerfilApi {
   id: number;
   nome: string;
@@ -8,7 +9,7 @@ export interface PerfilApi {
   desde: string;
 }
 
-const API = "http://localhost:5000/api/perfil";
+const API = `${API_ORIGIN}/api/perfil`;
 
 export async function obterPerfil(): Promise<PerfilApi> {
   const resposta = await fetch(API, { credentials: "include" });

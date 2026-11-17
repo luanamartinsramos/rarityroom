@@ -14,8 +14,9 @@ import {
 
 import "../shared/paginas.css";
 import "../shared/compra.css";
+import { API_ORIGIN } from "../../config";
 
-const API_FAVORITOS = "http://localhost:5000/api/favoritos";
+const API_FAVORITOS = `${API_ORIGIN}/api/favoritos`;
 
 function ProdutoPagina() {
   const { id } = useParams();

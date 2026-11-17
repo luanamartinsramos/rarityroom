@@ -1,3 +1,4 @@
+import { API_ORIGIN } from "../../config";
 export function classeSelo(status: string): string {
   if (["Pago", "Enviado", "Entregue", "Concluido"].includes(status)) return "ok";
   if (status === "Pendente") return "alerta";
@@ -15,7 +16,7 @@ export function etapaAtual(estado: string): number {
 }
 
 export async function obterMeuId(): Promise<number> {
-  const resposta = await fetch("http://localhost:5000/api/autenticacao/usuário-atual", {
+  const resposta = await fetch(`${API_ORIGIN}/api/autenticacao/usuário-atual`, {
     credentials: "include",
   });
 

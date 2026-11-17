@@ -31,6 +31,7 @@ import {
 } from "../../services/lojaService";
 
 import "../shared/paginas.css";
+import { API_ORIGIN } from "../../config";
 
 type Aba = "compras" | "vendas" | "favoritos" | "propostas" | "loja";
 
@@ -60,7 +61,7 @@ function ContaPagina() {
     try {
       const [dadosConta, listaPedidos, listaFavoritos, listaPropostas] =
         await Promise.all([
-          fetch("http://localhost:5000/api/autenticacao/usuário-atual", {
+          fetch(`${API_ORIGIN}/api/autenticacao/usuário-atual`, {
             credentials: "include",
           }).then((resposta) => (resposta.ok ? resposta.json() : null)),
           obterPedidos().catch(() => []),

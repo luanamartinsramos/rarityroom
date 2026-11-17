@@ -1,6 +1,7 @@
 import type { Produto } from "./produtosService";
+import { API_ORIGIN } from "../config";
 
-const API = "http://localhost:5000/api/favoritos";
+const API = `${API_ORIGIN}/api/favoritos`;
 
 export async function obterFavoritos(): Promise<Produto[]> {
   const resposta = await fetch(API, {

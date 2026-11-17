@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
+import { API_ORIGIN } from "../config";
 
 type ProtectedRouteProps = {
   children: React.ReactNode;
@@ -12,7 +13,7 @@ function ProtectedRoute({ children }: ProtectedRouteProps) {
     async function checkAuthentication() {
       try {
         const response = await fetch(
-          "http://localhost:5000/api/autenticacao/usuário-atual",
+          `${API_ORIGIN}/api/autenticacao/usuário-atual`,
           {
             method: "GET",
             credentials: "include",

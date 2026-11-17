@@ -1,3 +1,4 @@
+import { API_ORIGIN } from "../config";
 export function moeda(valor: number): string {
   return valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
@@ -42,5 +43,5 @@ export function urlImagem(url: string | null | undefined): string | undefined {
     return undefined;
   }
 
-  return url.startsWith("/uploads/") ? `http://localhost:5000${url}` : url;
+  return url.startsWith("/uploads/") ? `${API_ORIGIN}${url}` : url;
 }

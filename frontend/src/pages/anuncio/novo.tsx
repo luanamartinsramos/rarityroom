@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { obterCategorias, type Categoria } from "../../services/produtosService";
 
 import "../shared/paginas.css";
+import { API_ORIGIN } from "../../config";
 
 interface AnuncioForm {
   nome: string;
@@ -98,7 +99,7 @@ function NovoAnuncioPagina() {
     setEnviando(true);
 
     try {
-      const resposta = await fetch("http://localhost:5000/api/produtos", {
+      const resposta = await fetch(`${API_ORIGIN}/api/produtos`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },

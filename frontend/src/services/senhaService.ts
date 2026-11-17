@@ -1,4 +1,5 @@
-const API = "http://localhost:5000/api/autenticacao";
+import { API_ORIGIN } from "../config";
+const API = `${API_ORIGIN}/api/autenticacao`;
 
 export async function solicitarRecuperacao(
   email: string,

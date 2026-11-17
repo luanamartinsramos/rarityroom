@@ -1,3 +1,4 @@
+import { API_ORIGIN } from "../config";
 export interface NotificacaoApi {
   id: number;
   usuarioId: number;
@@ -12,7 +13,7 @@ export interface CentralNotificacoes {
   itens: NotificacaoApi[];
 }
 
-const API = "http://localhost:5000/api/notificacoes";
+const API = `${API_ORIGIN}/api/notificacoes`;
 
 export async function obterNotificacoes(): Promise<CentralNotificacoes> {
   const resposta = await fetch(API, {

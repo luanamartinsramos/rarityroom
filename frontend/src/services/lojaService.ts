@@ -1,3 +1,4 @@
+import { API_ORIGIN } from "../config";
 export interface LojaApi {
   id: number;
   donoId: number;
@@ -7,7 +8,7 @@ export interface LojaApi {
   criadaEm: string;
 }
 
-const API = "http://localhost:5000/api/lojas";
+const API = `${API_ORIGIN}/api/lojas`;
 
 export async function obterMinhaLoja(): Promise<LojaApi | null> {
   const resposta = await fetch(`${API}/minha`, {

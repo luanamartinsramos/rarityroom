@@ -1,3 +1,4 @@
+import { API_ORIGIN } from "../config";
 export interface AvaliacaoApi {
   id: number;
   pedidoId: number;
@@ -19,7 +20,7 @@ export async function obterResumoProduto(
   produtoId: number,
 ): Promise<ResumoAvaliacoes> {
   const resposta = await fetch(
-    `http://localhost:5000/api/avaliacoes/produto/${produtoId}`,
+    `${API_ORIGIN}/api/avaliacoes/produto/${produtoId}`,
     { method: "GET", credentials: "include" },
   );
 

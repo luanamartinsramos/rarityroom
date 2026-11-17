@@ -1,3 +1,4 @@
+import { API_ORIGIN } from "../config";
 export interface PropostaApi {
   id: number;
   produtoId: number;
@@ -8,7 +9,7 @@ export interface PropostaApi {
   criadaEm: string;
 }
 
-const API = "http://localhost:5000/api/propostas";
+const API = `${API_ORIGIN}/api/propostas`;
 
 export async function obterPropostas(): Promise<PropostaApi[]> {
   const resposta = await fetch(API, {

@@ -1,6 +1,7 @@
 import type { AvaliacaoApi } from "./avaliacoesService";
 import type { LojaApi } from "./lojaService";
 import type { Produto } from "./produtosService";
+import { API_ORIGIN } from "../config";
 
 export interface VendedorApi {
   id: number;
@@ -16,7 +17,7 @@ export interface VendedorApi {
   loja?: LojaApi | null;
 }
 
-const API = "http://localhost:5000/api";
+const API = `${API_ORIGIN}/api`;
 
 export async function obterProduto(id: number): Promise<Produto> {
   const resposta = await fetch(`${API}/produtos/${id}`, {
