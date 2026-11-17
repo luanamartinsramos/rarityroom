@@ -4,12 +4,15 @@ import { useNavigate } from "react-router-dom";
 
 import { obterFavoritos, removerFavorito } from "../../services/favoritosService";
 import {
+  concluirPedido,
   entregarPedido,
   enviarPedido,
   obterPedidos,
-  pagarPedido,
+  ROTULO_PAGAMENTO,
+  ROTULO_PEDIDO,
   type PedidoApi,
 } from "../../services/pedidosService";
+import { moeda, urlImagem } from "../../utils/formato";
 import type { Produto } from "../../services/produtosService";
 import {
   aceitarProposta,
@@ -150,11 +153,11 @@ function ContaPagina() {
     }
   }
 
-  async function agirPedido(id: number, acao: "pagar" | "enviar" | "entregar") {
+  async function agirPedido(id: number, acao: "concluir" | "enviar" | "entregar") {
     try {
-      if (acao === "pagar") {
-        await pagarPedido(id, true);
-        toast.success("Pagamento aprovado (simulação).");
+      if (acao === "concluir") {
+        await concluirPedido(id);
+        toast.success("Pedido concluído.");
       } else if (acao === "enviar") {
         await enviarPedido(id);
         toast.success("Pedido marcado como enviado.");
@@ -222,6 +225,10 @@ function ContaPagina() {
           Compras ({compras.length})
         </button>
 
+        <button onClick={() => navigate("/pedidos")}>Histórico de compras</button>
+
+        <button onClick={() => navigate("/carrinho")}>Carrinho</button>
+
         <button onClick={() => setAba("vendas")}>
           Vendas ({vendas.length})
         </button>
@@ -257,26 +264,34 @@ function ContaPagina() {
             {compras.map((pedido) => (
               <div className="notificacao" key={pedido.id}>
                 <div>
-                  <strong>Pedido #{pedido.id}</strong>
+                  <strong>Pedido {pedido.codigo}</strong>
 
                   <p>
-                    {pedido.nomeProduto} · R${" "}
-                    {pedido.precoUnitario.toFixed(2).replace(".", ",")}
+                    {pedido.itens
+                      .map((item) => `${item.quantidade}× ${item.nomeProduto}`)
+                      .join(", ")}{" "}
+                    · {moeda(pedido.total)}
                   </p>
 
                   <small>
-                    {pedido.estado} · {pedido.formaPagamento} ·{" "}
+                    {ROTULO_PEDIDO[pedido.estado] ?? pedido.estado} ·{" "}
+                    {ROTULO_PAGAMENTO[pedido.statusPagamento] ?? pedido.statusPagamento} ·{" "}
+                    {pedido.formaPagamento} ·{" "}
                     {new Date(pedido.criadoEm).toLocaleDateString("pt-BR")} ·
                     entrega em {pedido.entrega.cidade}/{pedido.entrega.estado}
                   </small>
                 </div>
 
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {pedido.estado === "Pendente" && (
-                    <button onClick={() => agirPedido(pedido.id, "pagar")}>
-                      Pagar (simulado)
+                  {pedido.estado === "Pendente" && pedido.pagamentoId && (
+                    <button onClick={() => navigate(`/pagamento/${pedido.pagamentoId}`)}>
+                      Pagar
                     </button>
                   )}
+
+                  <button onClick={() => navigate(`/pedidos/${pedido.id}`)}>
+                    Detalhes
+                  </button>
 
                   {pedido.estado === "Enviado" && (
                     <button onClick={() => agirPedido(pedido.id, "entregar")}>
@@ -306,15 +321,19 @@ function ContaPagina() {
             {vendas.map((pedido) => (
               <div className="notificacao" key={pedido.id}>
                 <div>
-                  <strong>Pedido #{pedido.id}</strong>
+                  <strong>Pedido {pedido.codigo}</strong>
 
                   <p>
-                    {pedido.nomeProduto} · R${" "}
-                    {pedido.precoUnitario.toFixed(2).replace(".", ",")}
+                    {pedido.itens
+                      .map((item) => `${item.quantidade}× ${item.nomeProduto}`)
+                      .join(", ")}{" "}
+                    · {moeda(pedido.total)}
                   </p>
 
                   <small>
-                    {pedido.estado} · comprador #{pedido.compradorId}
+                    {ROTULO_PEDIDO[pedido.estado] ?? pedido.estado} ·{" "}
+                    {ROTULO_PAGAMENTO[pedido.statusPagamento] ?? pedido.statusPagamento} · comprador #
+                    {pedido.compradorId} · entrega em {pedido.entrega.cidade}/{pedido.entrega.estado}
                   </small>
                 </div>
 
@@ -325,8 +344,14 @@ function ContaPagina() {
                     </button>
                   )}
 
-                  <button onClick={() => navigate(`/produto/${pedido.produtoId}`)}>
-                    Ver anúncio
+                  {["Pago", "Enviado", "Entregue"].includes(pedido.estado) && (
+                    <button onClick={() => agirPedido(pedido.id, "concluir")}>
+                      Concluir
+                    </button>
+                  )}
+
+                  <button onClick={() => navigate(`/pedidos/${pedido.id}`)}>
+                    Detalhes
                   </button>
                 </div>
               </div>
@@ -351,7 +376,7 @@ function ContaPagina() {
                   onClick={() => navigate(`/produto/${produto.id}`)}
                 >
                   {produto.imagemUrl ? (
-                    <img src={produto.imagemUrl} alt={produto.nome} />
+                    <img src={urlImagem(produto.imagemUrl)} alt={produto.nome} />
                   ) : (
                     <span>◇</span>
                   )}
@@ -505,7 +530,7 @@ function ContaPagina() {
 
               {loja?.fotoUrl && (
                 <img
-                  src={loja.fotoUrl}
+                  src={urlImagem(loja.fotoUrl)}
                   alt={loja.nome}
                   style={{
                     marginTop: 16,

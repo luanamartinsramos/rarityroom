@@ -213,15 +213,15 @@ function AdminPagina() {
             pedidos.map((pedido) => (
               <div className="notificacao" key={pedido.id}>
                 <div>
-                  <strong>Pedido #{pedido.id}</strong>
+                  <strong>Pedido {pedido.codigo}</strong>
 
                   <p>
-                    {pedido.nomeProduto} · R${" "}
-                    {pedido.precoUnitario.toFixed(2).replace(".", ",")}
+                    {pedido.nomeProduto} · {pedido.quantidadeTotal} un. · R${" "}
+                    {pedido.total.toFixed(2).replace(".", ",")}
                   </p>
 
                   <small>
-                    {pedido.estado} · {pedido.formaPagamento} · comprador #
+                    {pedido.estado} · {pedido.statusPagamento} · {pedido.formaPagamento} · comprador #
                     {pedido.compradorId}
                   </small>
                 </div>
