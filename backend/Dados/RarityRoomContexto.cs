@@ -264,7 +264,12 @@ public class RarityRoomContexto : DbContext
                 item.HasIndex(atual => atual.ProdutoId);
             });
 
-            entidade.Navigation(pedido => pedido.Itens).AutoInclude();
+            // O EF grava e lê pela lista privada "itens"; a propriedade
+            // pública é só leitura.
+            entidade.Navigation(pedido => pedido.Itens)
+                .HasField("itens")
+                .UsePropertyAccessMode(PropertyAccessMode.Field)
+                .AutoInclude();
 
             entidade.Property(pedido => pedido.Estado)
                 .IsRequired()

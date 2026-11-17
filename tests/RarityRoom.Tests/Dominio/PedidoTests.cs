@@ -43,6 +43,22 @@ public class PedidoTests
     }
 
     [Fact]
+    public void Itens_NaoPodemSerAlteradosDeFora_PreservandoOTotal()
+    {
+        var pedido = NovoPedido(Anuncio(preco: 100m), compradorId: 2, quantidade: 1);
+
+        // A coleção exposta é somente leitura: tentar incluir um item por fora
+        // falha e o total continua coerente com os itens.
+        var colecao = Assert.IsAssignableFrom<ICollection<ItemPedido>>(pedido.Itens);
+
+        Assert.True(colecao.IsReadOnly);
+        Assert.Throws<NotSupportedException>(
+            () => colecao.Add(new ItemPedido(Anuncio(id: 11), 5, 1m)));
+        Assert.Single(pedido.Itens);
+        Assert.Equal(100m, pedido.Total);
+    }
+
+    [Fact]
     public void Codigo_DeveSerUnicoPorPedido()
     {
         var codigos = Enumerable.Range(0, 200)

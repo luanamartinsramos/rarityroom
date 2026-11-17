@@ -24,7 +24,14 @@ public class Pedido
 
     public int VendedorId { get; private set; }
 
-    public List<ItemPedido> Itens { get; private set; } = new();
+    private readonly List<ItemPedido> itens = new();
+
+    /// <summary>
+    /// Itens somente leitura. A lista real é privada: ninguém fora do pedido
+    /// consegue incluir ou remover itens e quebrar a invariante
+    /// Total = soma dos subtotais (o total é calculado só no construtor).
+    /// </summary>
+    public IReadOnlyList<ItemPedido> Itens => itens.AsReadOnly();
 
     public decimal Total { get; private set; }
 
@@ -127,7 +134,7 @@ public class Pedido
         PagamentoId = pagamentoId;
         CompradorId = compradorId;
         VendedorId = vendedorId;
-        Itens = lista;
+        this.itens.AddRange(lista);
         Total = lista.Sum(item => item.Subtotal);
         Entrega = entrega;
         FormaPagamento = formaPagamento;
