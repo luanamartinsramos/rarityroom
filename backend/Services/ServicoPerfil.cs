@@ -33,14 +33,16 @@ public class ServicoPerfil : IServicoPerfil
     {
         var usuario = ObterUsuario(usuarioId);
 
-        var existente = repositorioUsuario.ObterPorEmail(email ?? string.Empty);
+        string novoEmail = email ?? string.Empty;
+
+        var existente = repositorioUsuario.ObterPorEmail(novoEmail);
 
         if (existente != null && existente.Id != usuarioId)
         {
             throw new ConflitoException("Este e-mail já está em uso.");
         }
 
-        usuario.AlterarEmail(email);
+        usuario.AlterarEmail(novoEmail);
 
         repositorioUsuario.Atualizar(usuario);
 
