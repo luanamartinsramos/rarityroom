@@ -1,7 +1,72 @@
 # Decisões de modelagem
 
-Registro das decisões que moldaram o domínio, no formato
-contexto → decisão → consequência.
+A **seção A** traz as decisões mais recentes com **comparação explícita de
+alternativas** (o que foi considerado, critérios e por que a escolhida
+venceu). A **seção B** é o registro histórico das decisões anteriores, no
+formato contexto → decisão → consequência.
+
+# A. Decisões com comparação de alternativas
+
+## DA1 — Um pedido por vendedor × um pedido único para o carrinho inteiro
+
+**Problema.** O carrinho pode ter anúncios de vendedores diferentes. Um
+checkout precisa gerar registros que o comprador acompanhe e que cada
+vendedor consiga atender (enviar, concluir, ser avaliado).
+
+| Critério | Alternativa 1: um `Pedido` com itens de vários vendedores | Alternativa 2 (escolhida): um `Pedido` por vendedor + um `Pagamento` para o checkout |
+|---|---|---|
+| Quem envia/conclui | ambíguo: `Pedido.VendedorId` deixa de existir; "enviar" de um vendedor marcaria o pedido inteiro | cada pedido tem exatamente um `VendedorId`; `ValidarVendedor` continua simples |
+| Avaliação e reputação | `Avaliacao.VendedorId` precisaria vir do item, e a reputação misturaria vendedores | `Avaliacao` herda o vendedor do pedido, como antes |
+| Cancelamento com estorno | estornar parte do pedido exigiria estados por item | cancela um pedido inteiro sem afetar o de outro vendedor |
+| Pagamento único | natural | exige a entidade `Pagamento` ligando 1..* pedidos |
+| Impacto no código existente | reescrever `ServicoAdmin`, `ServicoVendedores`, `Avaliacao`, telas de vendas | mantém `Pedido.VendedorId` e todo o pós-venda |
+
+**Escolha:** alternativa 2. O custo (uma entidade a mais, `Pagamento`) é menor
+que tornar ambíguas as responsabilidades de envio, avaliação e estorno. É o
+mesmo desenho dos marketplaces de referência (uma compra, várias entregas).
+**Evidência:** `ServicoPedidos.Finalizar` (`GroupBy(UsuarioId)`),
+`CarrinhoComDoisVendedores_GeraUmPedidoPorVendedor`.
+
+## DA2 — Itens do pedido como composição com *snapshot* × referência viva ao anúncio
+
+| Critério | Alternativa 1: `ItemPedido` só com `ProdutoId` e quantidade; preço lido do anúncio | Alternativa 2 (escolhida): `ItemPedido` composto pelo `Pedido`, copiando nome, imagem e preço |
+|---|---|---|
+| Histórico | editar o preço do anúncio reescreveria compras passadas | preço do momento da compra preservado (`Snapshot_NaoMudaQuandoOAnuncioMuda`) |
+| Anúncio excluído | pedido perderia nome e preço | pedido continua legível |
+| Duplicação de dados | nenhuma | nome/preço duplicados — **intencional**: representam fatos diferentes (preço praticado × preço atual) |
+| Ciclo de vida | item independente, precisaria de repositório | item só existe dentro do pedido (`OwnsMany`, cascade) |
+| Proteção do total | total recalculado a cada leitura, sujeito a mudança | `Total` calculado uma vez; lista privada somente leitura |
+
+**Escolha:** alternativa 2. A regra "preservar o preço praticado no momento da
+compra" é requisito; a duplicação é o preço dessa regra.
+
+## DA3 — Estado nomeado com tabela de transições × flags booleanas
+
+| Critério | Alternativa 1: `bool Pago`, `bool Enviado`, `bool Cancelado`... | Alternativa 2 (escolhida): `enum EstadoPedido`/`EstadoAnuncio` + dicionário `(origem, operação) → destino` |
+|---|---|---|
+| Combinações inválidas | possíveis (`Pago=false` e `Enviado=true`) | impossíveis: só há um estado por vez |
+| Onde vive a regra | espalhada em `if`s nos serviços | uma tabela privada na entidade |
+| Transição proibida | depende de cada chamador lembrar de verificar | `TransicaoInvalidaException` antes de alterar qualquer campo |
+| Distinguir operações com mesmo destino | — | `Reativar` × `CancelarReserva` (ambas → `Disponivel`) são chaves diferentes |
+
+**Escolha:** alternativa 2. **Evidência:** `ProdutoTransicoesTests`,
+`TransicaoProibida_ViaApi_EhRejeitadaENaoAlteraOBanco`.
+
+## DA4 — Carrinho no banco × carrinho no navegador (`localStorage`)
+
+| Critério | Alternativa 1: `localStorage` (como era) | Alternativa 2 (escolhida): tabela `itens_carrinho` por usuário |
+|---|---|---|
+| Vínculo com o usuário | por navegador, não por conta | por conta (`UsuarioId`), persiste entre dispositivos |
+| Validação de estoque/dono | só no cliente, contornável | no servidor, a cada operação (`RegrasCompra`) |
+| Preço exibido | cópia antiga guardada no navegador | sempre o atual, calculado no servidor |
+| Custo | zero no servidor | uma tabela e um serviço |
+
+**Escolha:** alternativa 2 — o requisito de não permitir manipular preço ou
+quantidade pelo frontend inviabiliza a alternativa 1.
+
+---
+
+# B. Registro histórico de decisões
 
 ---
 
@@ -32,7 +97,7 @@ tornava `Reativar` e `CancelarReserva` indistinguíveis: ambas levam a
 
 ---
 
-## D3 — Identificador gerado pelo repositório, sob trava
+## D3 — Identificador gerado pelo repositório, sob trava (substituída por D12)
 
 **Contexto.** `int id = repositorio.ObterTodos().Count + 1` reutilizava ids
 após uma exclusão. Reprodução: três anúncios (1, 2, 3), exclusão do 2, novo
