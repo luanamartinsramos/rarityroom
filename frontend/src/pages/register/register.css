@@ -817,3 +817,50 @@ input {
     padding: 30px 20px;
   }
 }
+
+/* Escolha do papel da conta */
+.register-tipo {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.register-tipo-titulo {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  color: #9b9b9b;
+}
+
+.register-tipo-opcoes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.register-tipo-opcoes label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: border-color 0.2s ease;
+}
+
+.register-tipo-opcoes label.ativo {
+  border-color: #d4af37;
+}
+
+.register-tipo-opcoes input {
+  display: none;
+}
+
+.register-tipo-opcoes strong {
+  font-size: 14px;
+}
+
+.register-tipo-opcoes span {
+  font-size: 12px;
+  color: #9b9b9b;
+}

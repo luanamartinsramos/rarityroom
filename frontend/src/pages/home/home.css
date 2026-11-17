@@ -67,8 +67,8 @@ button {
 
 .home-navbar {
   width: 100%;
-  height: 78px;
-  padding: 0 5%;
+  min-height: 78px;
+  padding: 10px 5%;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -109,7 +109,8 @@ button {
 }
 
 .home-search {
-  width: min(440px, 38vw);
+  width: 100%;
+  max-width: 440px;
   height: 42px;
   display: flex;
   align-items: center;
@@ -1708,7 +1709,7 @@ button {
 
 @media (max-width: 1050px) {
   .home-search {
-    width: 280px;
+    max-width: 340px;
   }
 
   .stats-section {
@@ -1732,11 +1733,19 @@ button {
 
 @media (max-width: 850px) {
   .home-navbar {
-    padding: 0 20px;
+    padding: 10px 16px;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .home-search-area {
+    order: 3;
+    flex: 1 1 100%;
+    max-width: none;
   }
 
   .home-search {
-    display: none;
+    max-width: none;
   }
 
   .hero-symbol {
@@ -2029,4 +2038,162 @@ button {
   .product-modal-details {
     grid-template-columns: 1fr;
   }
+}
+
+/* Checkout: endereço e forma de pagamento */
+.checkout-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px;
+}
+
+.checkout-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.checkout-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #9b9b9b;
+}
+
+.checkout-grid label.wide {
+  grid-column: 1 / -1;
+}
+
+.checkout-grid input,
+.checkout-grid select {
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  font-size: 14px;
+}
+
+.checkout-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.checkout-total strong {
+  font-size: 20px;
+}
+
+/* Filtros do catálogo */
+.toolbar-select,
+.toolbar-preco {
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  font-size: 13px;
+}
+
+.toolbar-preco {
+  width: 110px;
+}
+
+/* Área de busca com filtros logo abaixo */
+.home-search-area {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1 1 320px;
+  min-width: 0;
+  max-width: 460px;
+}
+
+.home-search-filtros {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.home-search-filtros .toolbar-select,
+.home-search-filtros .toolbar-preco {
+  height: 34px;
+  font-size: 12px;
+}
+
+.home-search-filtros .toolbar-select option {
+  background: #151020;
+}
+
+/* Botão "Destaques": mesmo visual dos filtros vizinhos. */
+.home-search-filtros > button {
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.home-search-filtros > button.active {
+  border-color: #d9aa32;
+  color: #d9aa32;
+  background: rgba(217, 170, 50, 0.08);
+}
+
+/* Área do vendedor */
+.seller-actions {
+  padding: 16px 24px 0;
+}
+
+.seller-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 24px 24px;
+}
+
+.seller-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+}
+
+.seller-item div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.seller-item span {
+  font-size: 12px;
+  color: #9b9b9b;
+}
+
+.seller-item-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.seller-item-actions button {
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+  cursor: pointer;
 }

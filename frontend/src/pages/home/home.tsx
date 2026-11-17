@@ -1,16 +1,42 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
-import type { Produto } from "../../services/produtosService";
-import { obterProdutos } from "../../services/produtosService";
+import {
+  obterCategorias,
+  obterMeusProdutos,
+  obterPaginaProdutos,
+  ORDENS,
+  type Produto,
+  type FiltroProdutos,
+} from "../../services/produtosService";
+import {
+  obterPedidos,
+  ROTULO_PEDIDO,
+  type PedidoApi,
+} from "../../services/pedidosService";
+import { obterNotificacoes } from "../../services/notificacoesService";
+import { obterCarrinho, ouvirCarrinho } from "../../services/carrinhoService";
+import { adicionarComAviso } from "../../services/carrinhoAcoes";
+import {
+  adicionarFavorito,
+  obterFavoritos,
+  removerFavorito,
+} from "../../services/favoritosService";
+import { estrelas, data, moeda, urlImagem } from "../../utils/formato";
+import { etapaAtual, NOMES_ETAPAS } from "../pedidos/rotulos";
 
 import "./home.css";
+import "../shared/compra.css";
+
+const TAMANHO_PAGINA = 12;
 
 interface Usuario {
   id: string;
   nome: string;
   email: string;
+  tipoConta?: string;
+  administrador?: boolean;
 }
 
 interface ProdutoForm {
@@ -25,50 +51,13 @@ interface ProdutoForm {
   imagemUrl: string;
 }
 
-interface CarrinhoItem extends Produto {
-  quantidade: number;
-}
-
-interface Pedido {
-  id: string;
-  produto: string;
-  quantidade: number;
-  total: number;
-  status: string;
-  data: string;
-}
-
-const categorias = [
-  {
-    nome: "Games",
-    descricao: "Jogos e acessórios",
-    icon: "🎮",
-    classe: "category-purple",
-  },
-  {
-    nome: "Heróis",
-    descricao: "Marvel, DC e muito mais",
-    icon: "🦸",
-    classe: "category-gold",
-  },
-  {
-    nome: "Fantasia",
-    descricao: "Magia e aventuras",
-    icon: "🧙",
-    classe: "category-blue",
-  },
-  {
-    nome: "Anime",
-    descricao: "Itens exclusivos",
-    icon: "👾",
-    classe: "category-red",
-  },
-  {
-    nome: "Figures",
-    descricao: "Bonecos e estátuas",
-    icon: "🧸",
-    classe: "category-pink",
-  },
+// Paleta visual aplicada às categorias vindas do catálogo do backend.
+const paletaCategorias = [
+  { descricao: "Jogos e acessórios", icon: "🎮", classe: "category-purple" },
+  { descricao: "Heróis e quadrinhos", icon: "🦸", classe: "category-gold" },
+  { descricao: "Itens colecionáveis", icon: "✨", classe: "category-blue" },
+  { descricao: "Animes e mangás", icon: "👾", classe: "category-red" },
+  { descricao: "Bonecos e estátuas", icon: "🧸", classe: "category-pink" },
 ];
 
 const emptyForm: ProdutoForm = {
@@ -89,19 +78,41 @@ function Home() {
   const [user, setUser] = useState<Usuario | null>(null);
   const [loadingUser, setLoadingUser] = useState(true);
 
-  const [products, setProducts] = useState<Produto[]>([]);
+  const [meusProdutos, setMeusProdutos] = useState<Produto[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(true);
 
-  const [search, setSearch] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("Todos");
+  // Critérios da pesquisa ficam na URL: voltar da página de um produto
+  // (ou recarregar) mantém termo, categoria, ordenação, filtros e página.
+  const [parametros, setParametros] = useSearchParams();
 
-  const [favorites, setFavorites] = useState<number[]>([]);
-  const [cart, setCart] = useState<CarrinhoItem[]>([]);
+  const termoUrl = parametros.get("q") ?? "";
+  const selectedCategory = parametros.get("categoria") ?? "Todos";
+  const ordem = parametros.get("ordem") ?? "Relevancia";
+  const pagina = Math.max(1, Number(parametros.get("pagina") ?? "1") || 1);
+  const precoMinUrl = parametros.get("min") ?? "";
+  const precoMaxUrl = parametros.get("max") ?? "";
+  const somenteDestaque = parametros.get("destaque") === "1";
 
-  const [showCart, setShowCart] = useState(false);
+  // Campos digitados: viram parâmetros da URL após uma pausa curta.
+  const [search, setSearch] = useState(termoUrl);
+  const [precoMin, setPrecoMin] = useState(precoMinUrl);
+  const [precoMax, setPrecoMax] = useState(precoMaxUrl);
+
+  const [categorias, setCategorias] = useState<
+    { nome: string; descricao: string; icon: string; classe: string }[]
+  >([]);
+
+  const [searchResults, setSearchResults] = useState<Produto[]>([]);
+  const [totalResultados, setTotalResultados] = useState(0);
+  const [searching, setSearching] = useState(false);
+  const [recarga, setRecarga] = useState(0);
+
+  const [favoriteProducts, setFavoriteProducts] = useState<Produto[]>([]);
+  const favorites = favoriteProducts.map((produto) => produto.id);
+  const [cartQuantity, setCartQuantity] = useState(0);
+
   const [showFavorites, setShowFavorites] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
-  const [showOrders, setShowOrders] = useState(false);
 
   const [selectedProduct, setSelectedProduct] = useState<Produto | null>(null);
 
@@ -112,16 +123,68 @@ function Home() {
 
   const [savingProduct, setSavingProduct] = useState(false);
 
-  const [orders, setOrders] = useState<Pedido[]>([
-    {
-      id: "RR-2026-00124",
-      produto: "Pedido em andamento",
-      quantidade: 1,
-      total: 349.9,
-      status: "Em transporte",
-      data: "28 de setembro",
-    },
-  ]);
+  const [orders, setOrders] = useState<PedidoApi[]>([]);
+
+  const [showSeller, setShowSeller] = useState(false);
+
+  const [naoLidas, setNaoLidas] = useState(0);
+
+  function atualizarParametros(
+    mudancas: Record<string, string | null>,
+    manterPagina = false,
+  ) {
+    setParametros(
+      (atuais) => {
+        const novos = new URLSearchParams(atuais);
+
+        for (const [chave, valor] of Object.entries(mudancas)) {
+          if (valor === null || valor === "") {
+            novos.delete(chave);
+          } else {
+            novos.set(chave, valor);
+          }
+        }
+
+        if (!manterPagina) {
+          novos.delete("pagina");
+        }
+
+        return novos;
+      },
+      { replace: true },
+    );
+  }
+
+  function setSelectedCategory(categoria: string) {
+    atualizarParametros({ categoria: categoria === "Todos" ? null : categoria });
+  }
+
+  function setOrdem(valor: string) {
+    atualizarParametros({ ordem: valor === "Relevancia" ? null : valor });
+  }
+
+  function irParaPagina(numero: number) {
+    atualizarParametros({ pagina: numero > 1 ? String(numero) : null }, true);
+    scrollToProducts();
+  }
+
+  function limparPesquisa() {
+    setSearch("");
+    setPrecoMin("");
+    setPrecoMax("");
+    setParametros(new URLSearchParams(), { replace: true });
+  }
+
+  function limparSoOTermo() {
+    setSearch("");
+    atualizarParametros({ q: null });
+  }
+
+  const meuId = Number(user?.id ?? 0);
+
+  function ehMeu(produto: Produto) {
+    return produto.usuarioId === meuId;
+  }
 
   useEffect(() => {
     async function loadUser() {
@@ -153,22 +216,27 @@ function Home() {
   }, [navigate]);
 
   async function loadProducts() {
-    try {
-      setLoadingProducts(true);
+    setRecarga((atual) => atual + 1);
 
-      const data = await obterProdutos();
-
-      setProducts(data);
-    } catch {
-      toast.error("Não foi possível carregar os produtos.");
-    } finally {
-      setLoadingProducts(false);
-    }
+    obterMeusProdutos()
+      .then(setMeusProdutos)
+      .catch(() => setMeusProdutos([]));
   }
 
+  // Favoritos e contador do carrinho vêm do servidor.
   useEffect(() => {
-    loadProducts();
-  }, []);
+    if (!user) {
+      return;
+    }
+
+    obterFavoritos().then(setFavoriteProducts).catch(() => setFavoriteProducts([]));
+    obterMeusProdutos().then(setMeusProdutos).catch(() => setMeusProdutos([]));
+    obterCarrinho()
+      .then((carrinho) => setCartQuantity(carrinho.quantidadeItens))
+      .catch(() => setCartQuantity(0));
+
+    return ouvirCarrinho((carrinho) => setCartQuantity(carrinho.quantidadeItens));
+  }, [user]);
 
   async function handleLogout() {
     try {
@@ -193,84 +261,31 @@ function Home() {
   }
 
   function scrollToProducts() {
-    setShowOrders(false);
 
     document.getElementById("products")?.scrollIntoView({ behavior: "smooth" });
   }
 
-  function scrollToOrders() {
-    setShowOrders(true);
+  async function toggleFavorite(product: Produto) {
+    const favoritado = favorites.includes(product.id);
 
-    setTimeout(() => {
-      document.getElementById("orders")?.scrollIntoView({ behavior: "smooth" });
-    }, 50);
-  }
-
-  function toggleFavorite(productId: number) {
-    setFavorites((current) => {
-      if (current.includes(productId)) {
+    try {
+      if (favoritado) {
+        await removerFavorito(product.id);
+        setFavoriteProducts((atual) => atual.filter((item) => item.id !== product.id));
         toast("Removido dos favoritos.");
-        return current.filter((id) => id !== productId);
+      } else {
+        await adicionarFavorito(product.id);
+        setFavoriteProducts((atual) => [...atual, product]);
+        toast.success("Adicionado aos favoritos! ♡");
       }
-
-      toast.success("Adicionado aos favoritos! ♡");
-      return [...current, productId];
-    });
-  }
-
-  function addToCart(product: Produto) {
-    setCart((current) => {
-      const existing = current.find((item) => item.id === product.id);
-
-      if (existing) {
-        return current.map((item) =>
-          item.id === product.id
-            ? {
-                ...item,
-                quantidade: item.quantidade + 1,
-              }
-            : item,
-        );
-      }
-
-      return [
-        ...current,
-        {
-          ...product,
-          quantidade: 1,
-        },
-      ];
-    });
-
-    toast.success(`${product.nome} foi para o carrinho! 🛒`);
-  }
-
-  function removeFromCart(productId: number) {
-    setCart((current) => current.filter((item) => item.id !== productId));
-  }
-
-  function changeCartQuantity(productId: number, quantidade: number) {
-    if (quantidade <= 0) {
-      removeFromCart(productId);
-      return;
+    } catch (falha) {
+      toast.error(falha instanceof Error ? falha.message : "Não foi possível atualizar o favorito.");
     }
-
-    setCart((current) =>
-      current.map((item) =>
-        item.id === productId
-          ? {
-              ...item,
-              quantidade,
-            }
-          : item,
-      ),
-    );
   }
 
-  function openCreateProduct() {
-    setEditingProduct(null);
-    setProductForm(emptyForm);
-    setShowProductForm(true);
+  /** Mesma ação usada na página do produto (ver carrinhoAcoes). */
+  function addToCart(product: Produto) {
+    void adicionarComAviso(product, 1);
   }
 
   function openEditProduct(product: Produto) {
@@ -345,7 +360,7 @@ function Home() {
       if (!response.ok) {
         const error = await response.json().catch(() => null);
 
-        toast.error(error?.mensagem || "Não foi possível salvar o produto.");
+        toast.error(error?.detail || error?.mensagem || "Não foi possível salvar o produto.");
 
         return;
       }
@@ -389,18 +404,14 @@ function Home() {
       if (!response.ok) {
         const error = await response.json().catch(() => null);
 
-        toast.error(error?.mensagem || "Não foi possível excluir o produto.");
+        toast.error(error?.detail || error?.mensagem || "Não foi possível excluir o produto.");
 
         return;
       }
 
-      setProducts((current) =>
-        current.filter((product) => product.id !== productId),
-      );
+      setFavoriteProducts((current) => current.filter((item) => item.id !== productId));
 
-      setFavorites((current) => current.filter((id) => id !== productId));
-
-      setCart((current) => current.filter((item) => item.id !== productId));
+      await loadProducts();
 
       toast.success("Produto excluído com sucesso.");
     } catch {
@@ -408,37 +419,112 @@ function Home() {
     }
   }
 
-  const filteredProducts = useMemo(() => {
-    return products.filter((product) => {
-      const searchValue = search.toLowerCase().trim();
+  // Texto digitado → URL, com espera curta para não pesquisar a cada tecla.
+  useEffect(() => {
+    const temporizador = setTimeout(() => {
+      const mudancas: Record<string, string | null> = {};
 
-      const matchesSearch =
-        !searchValue ||
-        product.nome.toLowerCase().includes(searchValue) ||
-        product.categoria.toLowerCase().includes(searchValue) ||
-        product.marca.toLowerCase().includes(searchValue) ||
-        product.colecao.toLowerCase().includes(searchValue);
+      if (search.trim() !== termoUrl) mudancas.q = search.trim() || null;
+      if (precoMin.trim() !== precoMinUrl) mudancas.min = precoMin.trim() || null;
+      if (precoMax.trim() !== precoMaxUrl) mudancas.max = precoMax.trim() || null;
 
-      const matchesCategory =
-        selectedCategory === "Todos" ||
-        product.categoria.toLowerCase() === selectedCategory.toLowerCase();
+      if (Object.keys(mudancas).length > 0) {
+        atualizarParametros(mudancas);
+      }
+    }, 350);
 
-      return matchesSearch && matchesCategory;
-    });
-  }, [products, search, selectedCategory]);
+    return () => clearTimeout(temporizador);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search, precoMin, precoMax]);
 
-  const favoriteProducts = products.filter((product) =>
-    favorites.includes(product.id),
-  );
+  // Pesquisa no servidor sempre que um critério da URL muda.
+  useEffect(() => {
+    let cancelado = false;
 
-  const cartTotal = cart.reduce(
-    (total, item) => total + item.preco * item.quantidade,
-    0,
-  );
+    setSearching(true);
 
-  const cartQuantity = cart.reduce((total, item) => total + item.quantidade, 0);
+    const filtro: FiltroProdutos = {
+      termo: termoUrl,
+      ordem,
+      pagina,
+      tamanhoPagina: TAMANHO_PAGINA,
+    };
 
-  const featuredProduct = products[0];
+    if (selectedCategory !== "Todos") {
+      filtro.categoria = selectedCategory;
+    }
+
+    const minimo = Number(precoMinUrl.replace(",", "."));
+    const maximo = Number(precoMaxUrl.replace(",", "."));
+
+    if (precoMinUrl && Number.isFinite(minimo)) filtro.precoMin = minimo;
+    if (precoMaxUrl && Number.isFinite(maximo)) filtro.precoMax = maximo;
+    if (somenteDestaque) filtro.destaque = true;
+
+    obterPaginaProdutos(filtro)
+      .then((resultado) => {
+        if (cancelado) return;
+        setSearchResults(resultado.itens);
+        setTotalResultados(resultado.total);
+      })
+      .catch(() => !cancelado && toast.error("Não foi possível pesquisar."))
+      .finally(() => {
+        if (!cancelado) {
+          setSearching(false);
+          setLoadingProducts(false);
+        }
+      });
+
+    return () => {
+      cancelado = true;
+    };
+  }, [termoUrl, selectedCategory, ordem, pagina, precoMinUrl, precoMaxUrl, somenteDestaque, recarga]);
+
+  // Categorias vêm do catálogo do backend, não de uma lista fixa.
+  useEffect(() => {
+    obterCategorias()
+      .then((lista) =>
+        setCategorias(
+          lista.map((categoria, indice) => ({
+            nome: categoria.nome,
+            ...paletaCategorias[indice % paletaCategorias.length],
+          })),
+        ),
+      )
+      .catch(() => setCategorias([]));
+  }, []);
+
+  // Contador de notificações não lidas no cabeçalho.
+  useEffect(() => {
+    if (!user) {
+      setNaoLidas(0);
+      return;
+    }
+
+    obterNotificacoes()
+      .then((central) => setNaoLidas(central.naoLidas))
+      .catch(() => setNaoLidas(0));
+  }, [user]);
+
+  // Pedidos vêm do servidor: conta nova não tem nenhum.
+  useEffect(() => {
+    if (!user) {
+      setOrders([]);
+      return;
+    }
+
+    obterPedidos()
+      .then((lista) =>
+        setOrders(lista.filter((pedido) => String(pedido.compradorId) === String(user.id))),
+      )
+      .catch(() => setOrders([]));
+  }, [user]);
+
+  const totalPaginas = Math.max(1, Math.ceil(totalResultados / TAMANHO_PAGINA));
+  const ultimoPedido = orders[0];
+  const etapaUltimo = ultimoPedido ? etapaAtual(ultimoPedido.estado) : -1;
+  const filtrando =
+    termoUrl !== "" || selectedCategory !== "Todos" || precoMinUrl !== "" || precoMaxUrl !== "" || somenteDestaque;
 
   if (loadingUser) {
     return (
@@ -468,24 +554,105 @@ function Home() {
           RARITYROOM
         </button>
 
-        <div className="home-search">
+        <div className="home-search-area">
+          <div className="home-search">
           <span>⌕</span>
 
           <input
             type="text"
+            aria-label="Pesquisar produtos"
             placeholder="Buscar itens, personagens, coleções..."
             value={search}
             onChange={(event) => setSearch(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                atualizarParametros({ q: search.trim() || null });
+                scrollToProducts();
+              }
+            }}
           />
+
+          {search && (
+            <button
+              type="button"
+              className="link-texto"
+              aria-label="Limpar pesquisa"
+              onClick={limparSoOTermo}
+            >
+              ✕
+            </button>
+          )}
+          </div>
+
+          <div className="home-search-filtros">
+            <select
+              className="toolbar-select"
+              aria-label="Ordenar por"
+              value={ordem}
+              onChange={(event) => setOrdem(event.target.value)}
+            >
+              {ORDENS.map((opcao) => (
+                <option key={opcao.valor} value={opcao.valor}>
+                  {opcao.rotulo}
+                </option>
+              ))}
+            </select>
+
+            <input
+              className="toolbar-preco"
+              placeholder="Preço mín."
+              value={precoMin}
+              onChange={(event) => setPrecoMin(event.target.value)}
+            />
+
+            <input
+              className="toolbar-preco"
+              placeholder="Preço máx."
+              value={precoMax}
+              onChange={(event) => setPrecoMax(event.target.value)}
+            />
+
+            <button
+              className={somenteDestaque ? "active" : ""}
+              onClick={() => atualizarParametros({ destaque: somenteDestaque ? null : "1" })}
+            >
+              ★ Destaques
+            </button>
+          </div>
         </div>
 
         <div className="home-nav-actions">
+          {user?.administrador && (
+            <button
+              className="nav-button"
+              onClick={() => navigate("/admin")}
+            >
+              ⚙️ <span>Admin</span>
+            </button>
+          )}
+
+          <button className="nav-button" onClick={() => navigate("/conta")}>
+            👤 <span>Minha conta</span>
+          </button>
+
+          <button
+            className="nav-button"
+            onClick={() => navigate("/notificacoes")}
+          >
+            🔔 <span>Notificações</span>
+            {naoLidas > 0 && <strong>{naoLidas}</strong>}
+          </button>
+
+          <button className="nav-button" onClick={() => setShowSeller(true)}>
+            🏪 <span>Vender</span>
+          </button>
+
           <button className="nav-button" onClick={() => setShowFavorites(true)}>
             ♡ <span>Favoritos</span>
             {favorites.length > 0 && <strong>{favorites.length}</strong>}
           </button>
 
-          <button className="nav-button" onClick={() => setShowCart(true)}>
+          <button className="nav-button" onClick={() => navigate("/carrinho")}>
             🛒 <span>Carrinho</span>
             {cartQuantity > 0 && <strong>{cartQuantity}</strong>}
           </button>
@@ -510,7 +677,7 @@ function Home() {
                 <button
                   onClick={() => {
                     setShowProfile(false);
-                    scrollToOrders();
+                    navigate("/pedidos");
                   }}
                 >
                   📦 Meus pedidos
@@ -528,7 +695,7 @@ function Home() {
                 <button
                   onClick={() => {
                     setShowProfile(false);
-                    setShowCart(true);
+                    navigate("/carrinho");
                   }}
                 >
                   🛒 Meu carrinho
@@ -562,7 +729,7 @@ function Home() {
                 Meu catálogo →
               </button>
 
-              <button className="secondary-button" onClick={scrollToOrders}>
+              <button className="secondary-button" onClick={() => navigate("/pedidos")}>
                 Ver meus pedidos
               </button>
             </div>
@@ -591,10 +758,7 @@ function Home() {
             <div>
               <small>A CAMINHO</small>
               <strong>
-                {
-                  orders.filter((order) => order.status === "Em transporte")
-                    .length
-                }
+                {orders.filter((order) => order.estado === "Enviado").length}
               </strong>
             </div>
           </div>
@@ -625,10 +789,10 @@ function Home() {
               <h2>Meus pedidos</h2>
             </div>
 
-            <button onClick={scrollToOrders}>Ver todos →</button>
+            <button onClick={() => navigate("/pedidos")}>Ver todos →</button>
           </div>
 
-          {orders.length === 0 ? (
+          {!ultimoPedido ? (
             <div className="order-empty">
               <span>📦</span>
               <h3>Você ainda não possui pedidos</h3>
@@ -642,13 +806,17 @@ function Home() {
             </div>
           ) : (
             <>
-              <div className="order-card">
+              <div
+                className="order-card"
+                style={{ cursor: "pointer" }}
+                onClick={() => navigate(`/pedidos/${ultimoPedido.id}`)}
+              >
                 <div className="order-product">
                   <div className="product-image">
-                    {featuredProduct ? (
+                    {ultimoPedido.itens[0]?.imagemUrl ? (
                       <img
-                        src={featuredProduct.imagemUrl}
-                        alt={featuredProduct.nome}
+                        src={urlImagem(ultimoPedido.itens[0].imagemUrl)}
+                        alt={ultimoPedido.nomeProduto}
                       />
                     ) : (
                       <span>📦</span>
@@ -656,60 +824,49 @@ function Home() {
                   </div>
 
                   <div>
-                    <span className="order-number">PEDIDO #{orders[0].id}</span>
+                    <span className="order-number">PEDIDO {ultimoPedido.codigo}</span>
 
-                    <h3>{featuredProduct?.nome || orders[0].produto}</h3>
+                    <h3>{ultimoPedido.nomeProduto}</h3>
 
-                    <p>{orders[0].quantidade} unidade</p>
+                    <p>
+                      {ultimoPedido.quantidadeTotal}{" "}
+                      {ultimoPedido.quantidadeTotal === 1 ? "unidade" : "unidades"}
+                    </p>
                   </div>
                 </div>
 
                 <div className="order-price">
                   <small>TOTAL</small>
 
-                  <strong>
-                    R$ {orders[0].total.toFixed(2).replace(".", ",")}
-                  </strong>
+                  <strong>{moeda(ultimoPedido.total)}</strong>
                 </div>
 
                 <div className="order-status">
                   <span className="status-dot"></span>
 
                   <div>
-                    <strong>{orders[0].status}</strong>
+                    <strong>{ROTULO_PEDIDO[ultimoPedido.estado] ?? ultimoPedido.estado}</strong>
 
-                    <small>Previsão: {orders[0].data}</small>
+                    <small>Feito em {data(ultimoPedido.criadoEm)}</small>
                   </div>
                 </div>
               </div>
 
-              <div className="order-progress">
-                <div className="progress-step active">
-                  <span>✓</span>
-                  <small>Pedido realizado</small>
+              {etapaUltimo >= 0 && (
+                <div className="order-progress">
+                  {NOMES_ETAPAS.slice(0, 4).map((nome, indice) => (
+                    <div key={nome} style={{ display: "contents" }}>
+                      {indice > 0 && (
+                        <div className={`progress-line ${indice <= etapaUltimo ? "active" : ""}`}></div>
+                      )}
+                      <div className={`progress-step ${indice <= etapaUltimo ? "active" : ""}`}>
+                        <span>{indice <= etapaUltimo ? "✓" : "○"}</span>
+                        <small>{nome}</small>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-
-                <div className="progress-line active"></div>
-
-                <div className="progress-step active">
-                  <span>✓</span>
-                  <small>Preparando</small>
-                </div>
-
-                <div className="progress-line active"></div>
-
-                <div className="progress-step active">
-                  <span>🚚</span>
-                  <small>Em transporte</small>
-                </div>
-
-                <div className="progress-line"></div>
-
-                <div className="progress-step">
-                  <span>○</span>
-                  <small>Entregue</small>
-                </div>
-              </div>
+              )}
             </>
           )}
         </section>
@@ -752,16 +909,28 @@ function Home() {
         <section className="recommended-section" id="products">
           <div className="section-heading">
             <div>
-              <span>hora de vender seus itens estagnados</span>
-              <h2>Cadastre seus itens no catálogo</h2>
+              <span>{termoUrl ? "RESULTADOS DA PESQUISA" : "CATÁLOGO"}</span>
+              <h2>
+                {termoUrl ? `Resultados para "${termoUrl}"` : "Itens à venda"}
+              </h2>
             </div>
 
-            <div className="product-actions">
-              <button onClick={openCreateProduct}>+ Cadastrar produto</button>
-            </div>
+            {filtrando && (
+              <button onClick={limparPesquisa}>Limpar pesquisa e filtros ✕</button>
+            )}
           </div>
 
+          {!searching && (
+            <p style={{ color: "#9b8fb0", margin: "0 0 12px" }}>
+              {totalResultados} {totalResultados === 1 ? "produto encontrado" : "produtos encontrados"}
+              {" · ordenado por "}
+              {ORDENS.find((opcao) => opcao.valor === ordem)?.rotulo ?? "Relevância"}
+              {totalPaginas > 1 && ` · página ${pagina} de ${totalPaginas}`}
+            </p>
+          )}
+
           <div className="product-toolbar">
+
             <button
               className={selectedCategory === "Todos" ? "active" : ""}
               onClick={() => setSelectedCategory("Todos")}
@@ -781,26 +950,43 @@ function Home() {
           </div>
 
           <div className="products-grid">
-            {loadingProducts ? (
+            {loadingProducts || searching ? (
               <div className="products-loading">Carregando produtos...</div>
-            ) : filteredProducts.length === 0 ? (
+            ) : searchResults.length === 0 ? (
               <div className="products-empty">
                 <span>◇</span>
                 <h3>Nenhum produto encontrado</h3>
-                <p>Tente outra busca ou cadastre um novo produto.</p>
+                <p>
+                  {termoUrl
+                    ? `Nenhum anúncio corresponde a "${termoUrl}". Confira a ortografia ou use menos palavras.`
+                    : "Nenhum anúncio corresponde aos filtros escolhidos."}
+                </p>
 
-                <button className="primary-button" onClick={openCreateProduct}>
-                  Cadastrar produto
-                </button>
+                {filtrando ? (
+                  <button className="primary-button" onClick={limparPesquisa}>
+                    Limpar pesquisa e voltar ao catálogo
+                  </button>
+                ) : (
+                  <button
+                    className="primary-button"
+                    onClick={() => navigate("/anuncios/novo")}
+                  >
+                    Cadastrar produto
+                  </button>
+                )}
               </div>
             ) : (
-              filteredProducts.map((product) => (
+              searchResults.map((product) => (
                 <article className="product-card" key={product.id}>
                   <div
                     className="product-cover"
                     onClick={() => setSelectedProduct(product)}
                   >
-                    <img src={product.imagemUrl} alt={product.nome} />
+                    {product.imagemUrl ? (
+                      <img src={urlImagem(product.imagemUrl)} alt={product.nome} />
+                    ) : (
+                      <span style={{ fontSize: 48, color: "#3a2c50", display: "grid", placeItems: "center", height: "100%" }}>◇</span>
+                    )}
 
                     <button
                       className={`favorite ${
@@ -808,7 +994,7 @@ function Home() {
                       }`}
                       onClick={(event) => {
                         event.stopPropagation();
-                        toggleFavorite(product.id);
+                        void toggleFavorite(product);
                       }}
                     >
                       {favorites.includes(product.id) ? "♥" : "♡"}
@@ -820,158 +1006,134 @@ function Home() {
 
                     <h3>{product.nome}</h3>
 
-                    <strong>
-                      R$ {product.preco.toFixed(2).replace(".", ",")}
-                    </strong>
+                    <strong>{moeda(product.preco)}</strong>
+
+                    <small style={{ color: "#9b8fb0", display: "block", marginTop: 4 }}>
+                      {product.vendedorNome ? `por ${product.vendedorNome} · ` : ""}
+                      {(product.totalAvaliacoes ?? 0) > 0
+                        ? `${estrelas(product.mediaAvaliacoes ?? 0)} (${product.totalAvaliacoes})`
+                        : "Sem avaliações"}
+                      {(product.vendas ?? 0) > 0 && ` · ${product.vendas} vendido(s)`}
+                    </small>
+
+                    <small style={{ color: product.estoque <= 2 ? "#f1d58a" : "#9b8fb0", display: "block" }}>
+                      {product.estoque === 1 ? "Última unidade!" : `${product.estoque} em estoque`}
+                    </small>
 
                     <div className="product-card-actions">
-                      <button onClick={() => setSelectedProduct(product)}>
+                      <button onClick={() => navigate(`/produto/${product.id}`)}>
                         Ver detalhes
                       </button>
 
-                      <button onClick={() => addToCart(product)}>
-                        Adicionar
+                      <button
+                        onClick={() => addToCart(product)}
+                        disabled={ehMeu(product)}
+                        title={ehMeu(product) ? "Este anúncio é seu" : undefined}
+                      >
+                        {ehMeu(product) ? "Seu anúncio" : "Adicionar"}
                       </button>
                     </div>
 
-                    <div className="product-management">
-                      <button onClick={() => openEditProduct(product)}>
-                        Editar
-                      </button>
+                    {ehMeu(product) && (
+                      <div className="product-management">
+                        <button onClick={() => openEditProduct(product)}>
+                          Editar
+                        </button>
 
-                      <button onClick={() => handleDeleteProduct(product.id)}>
-                        Excluir
-                      </button>
-                    </div>
+                        <button onClick={() => handleDeleteProduct(product.id)}>
+                          Excluir
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </article>
               ))
             )}
           </div>
+
+          {!searching && totalPaginas > 1 && (
+            <nav className="paginacao" aria-label="Páginas de resultados">
+              <button disabled={pagina <= 1} onClick={() => irParaPagina(pagina - 1)}>
+                ‹
+              </button>
+
+              {Array.from({ length: totalPaginas }, (_, indice) => indice + 1)
+                .filter((numero) => Math.abs(numero - pagina) <= 2 || numero === 1 || numero === totalPaginas)
+                .map((numero) => (
+                  <button
+                    key={numero}
+                    className={numero === pagina ? "ativa" : ""}
+                    onClick={() => irParaPagina(numero)}
+                  >
+                    {numero}
+                  </button>
+                ))}
+
+              <button disabled={pagina >= totalPaginas} onClick={() => irParaPagina(pagina + 1)}>
+                ›
+              </button>
+            </nav>
+          )}
         </section>
       </div>
 
-      {showCart && (
-        <div className="modal-overlay" onClick={() => setShowCart(false)}>
+      {showSeller && (
+        <div className="modal-overlay" onClick={() => setShowSeller(false)}>
           <aside
             className="side-panel"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="panel-header">
               <div>
-                <span>MINHA COMPRA</span>
-                <h2>Carrinho</h2>
+                <span>ÁREA DO VENDEDOR</span>
+                <h2>Meus anúncios</h2>
               </div>
 
-              <button onClick={() => setShowCart(false)}>×</button>
+              <button onClick={() => setShowSeller(false)}>×</button>
             </div>
 
-            {cart.length === 0 ? (
-              <div className="panel-empty">
-                <span>🛒</span>
-                <h3>Seu carrinho está vazio</h3>
-                <p>Adicione produtos para começar sua compra.</p>
+            <div className="seller-actions">
+              <button
+                className="primary-button"
+                onClick={() => navigate("/anuncios/novo")}
+              >
+                + Cadastrar produto
+              </button>
+            </div>
 
-                <button
-                  className="primary-button"
-                  onClick={() => {
-                    setShowCart(false);
-                    scrollToProducts();
-                  }}
-                >
-                  Explorar produtos
-                </button>
+            {meusProdutos.length === 0 ? (
+              <div className="panel-empty">
+                <span>◇</span>
+                <h3>Você ainda não publicou nada</h3>
+                <p>Cadastre seu primeiro item para começar a vender.</p>
               </div>
             ) : (
-              <>
-                <div className="cart-items">
-                  {cart.map((item) => (
-                    <div className="cart-item" key={item.id}>
-                      <img src={item.imagemUrl} alt={item.nome} />
+              <div className="seller-list">
+                {meusProdutos.map((produto) => (
+                  <div className="seller-item" key={produto.id}>
+                    <div>
+                      <strong>{produto.nome}</strong>
 
-                      <div>
-                        <strong>{item.nome}</strong>
+                      <span>
+                        R$ {produto.preco.toFixed(2).replace(".", ",")} ·{" "}
+                        {produto.estado}
+                      </span>
 
-                        <span>
-                          R$ {item.preco.toFixed(2).replace(".", ",")}
-                        </span>
+                      <span>Estoque: {produto.estoque}</span>
+                    </div>
 
-                        <div className="quantity-control">
-                          <button
-                            onClick={() =>
-                              changeCartQuantity(item.id, item.quantidade - 1)
-                            }
-                          >
-                            −
-                          </button>
+                    <div className="seller-item-actions">
+                      <button onClick={() => openEditProduct(produto)}>
+                        Editar
+                      </button>
 
-                          <span>{item.quantidade}</span>
-
-                          <button
-                            onClick={() =>
-                              changeCartQuantity(item.id, item.quantidade + 1)
-                            }
-                          >
-                            +
-                          </button>
-                        </div>
-                      </div>
-
-                      <button
-                        className="remove-item"
-                        onClick={() => removeFromCart(item.id)}
-                      >
-                        ×
+                      <button onClick={() => handleDeleteProduct(produto.id)}>
+                        Excluir
                       </button>
                     </div>
-                  ))}
-                </div>
-
-                <div className="cart-footer">
-                  <div>
-                    <span>Total</span>
-
-                    <strong>R$ {cartTotal.toFixed(2).replace(".", ",")}</strong>
                   </div>
-
-                  <button
-                    className="primary-button"
-                    onClick={() => {
-                      if (cart.length === 0) {
-                        return;
-                      }
-
-                      const newOrder: Pedido = {
-                        id: `RR-2026-${String(orders.length + 125).padStart(
-                          5,
-                          "0",
-                        )}`,
-                        produto:
-                          cart.length === 1
-                            ? cart[0].nome
-                            : `${cart.length} produtos`,
-                        quantidade: cartQuantity,
-                        total: cartTotal,
-                        status: "Pedido realizado",
-                        data: "Aguardando confirmação",
-                      };
-
-                      setOrders((current) => [newOrder, ...current]);
-
-                      setCart([]);
-                      setShowCart(false);
-
-                      toast.success("Pedido criado com sucesso! ✨");
-
-                      setTimeout(() => {
-                        scrollToOrders();
-                      }, 100);
-                    }}
-                  >
-                    Finalizar pedido →
-                  </button>
-                </div>
-              </>
+                ))}
+              </div>
             )}
           </aside>
         </div>
@@ -1012,7 +1174,11 @@ function Home() {
               <div className="favorite-list">
                 {favoriteProducts.map((product) => (
                   <div className="favorite-item" key={product.id}>
-                    <img src={product.imagemUrl} alt={product.nome} />
+                    {product.imagemUrl ? (
+                      <img src={urlImagem(product.imagemUrl)} alt={product.nome} />
+                    ) : (
+                      <span style={{ fontSize: 48, color: "#3a2c50", display: "grid", placeItems: "center", height: "100%" }}>◇</span>
+                    )}
 
                     <div>
                       <span>{product.categoria}</span>
@@ -1022,12 +1188,12 @@ function Home() {
                         R$ {product.preco.toFixed(2).replace(".", ",")}
                       </small>
 
-                      <button onClick={() => addToCart(product)}>
-                        Adicionar ao carrinho
+                      <button onClick={() => addToCart(product)} disabled={ehMeu(product) || !product.disponivel}>
+                        {ehMeu(product) ? "Seu anúncio" : product.disponivel ? "Adicionar ao carrinho" : "Indisponível"}
                       </button>
                     </div>
 
-                    <button onClick={() => toggleFavorite(product.id)}>
+                    <button onClick={() => void toggleFavorite(product)}>
                       ♥
                     </button>
                   </div>
@@ -1052,13 +1218,29 @@ function Home() {
             </button>
 
             <div className="product-modal-image">
-              <img src={selectedProduct.imagemUrl} alt={selectedProduct.nome} />
+              {selectedProduct.imagemUrl ? (
+                <img src={urlImagem(selectedProduct.imagemUrl)} alt={selectedProduct.nome} />
+              ) : (
+                <span style={{ fontSize: 64, color: "#3a2c50", display: "grid", placeItems: "center", height: "100%" }}>◇</span>
+              )}
             </div>
 
             <div className="product-modal-content">
               <span>{selectedProduct.categoria}</span>
 
               <h2>{selectedProduct.nome}</h2>
+
+              <button
+                className="primary-button"
+                style={{ marginBottom: 12 }}
+                onClick={() => {
+                  const produtoId = selectedProduct.id;
+                  setSelectedProduct(null);
+                  navigate(`/produto/${produtoId}`);
+                }}
+              >
+                Ver página do produto
+              </button>
 
               <p>
                 {selectedProduct.descricao ||
@@ -1088,18 +1270,17 @@ function Home() {
               </div>
 
               <div className="product-modal-footer">
-                <strong>
-                  R$ {selectedProduct.preco.toFixed(2).replace(".", ",")}
-                </strong>
+                <strong>{moeda(selectedProduct.preco)}</strong>
 
                 <button
                   className="primary-button"
+                  disabled={ehMeu(selectedProduct)}
                   onClick={() => {
                     addToCart(selectedProduct);
                     setSelectedProduct(null);
                   }}
                 >
-                  Adicionar ao carrinho →
+                  {ehMeu(selectedProduct) ? "Este anúncio é seu" : "Adicionar ao carrinho →"}
                 </button>
               </div>
             </div>

@@ -1,0 +1,479 @@
+{
+  "projeto": "RarityRoom",
+  "artefato": "evidencias-av2",
+  "ambiente": {
+    "sdkDotnet": "10.0.401",
+    "targetFramework": "net10.0",
+    "node": "v26.13.0",
+    "frontend": "React 19 + Vite (porta 5173)",
+    "backend": "ASP.NET Core (porta 5000)"
+  },
+  "banco": {
+    "tipo": "SQLite",
+    "orm": "EF Core 10.0.15",
+    "migracoes": [
+      "20261115024545_Inicial",
+      "20261115030519_PedidosAvaliacoes",
+      "20261115051041_PerfilECheckout",
+      "20261115053340_DetalhesDoProduto",
+      "20261115054915_Notificacoes",
+      "20261115055005_AlinharCategorias",
+      "20261115055425_Administrador",
+      "20261115055904_PagamentoDoPedido",
+      "20261115060145_AvaliacaoDoProduto",
+      "20261115060405_LojaDoVendedor",
+      "20261115055851_PerfilEnderecosESenha"
+    ],
+    "tabelas": [
+      "usuarios",
+      "categorias",
+      "produtos",
+      "propostas",
+      "favoritos",
+      "pedidos",
+      "avaliacoes",
+      "notificacoes",
+      "lojas",
+      "enderecos",
+      "recuperacoes_senha"
+    ],
+    "persistenciaComprovadaPorReinicio": true
+  },
+  "build": {
+    "comando": "dotnet build",
+    "erros": 0,
+    "avisos": 0
+  },
+  "testes": {
+    "comando": "dotnet test",
+    "total": 174,
+    "aprovados": 174,
+    "falhas": 0,
+    "ignorados": 0,
+    "porArquivo": {
+      "Dominio/UsuarioTests.cs": 13,
+      "Dominio/ProdutoTransicoesTests.cs": 12,
+      "Servicos/ServicoAnunciosTests.cs": 11,
+      "Dominio/ProdutoValidacaoTests.cs": 10,
+      "Api/FluxoApiTests.cs": 24,
+      "Dominio/CategoriaTests.cs": 9,
+      "Repositorios/RepositorioEfTests.cs": 9,
+      "Servicos/ServicoAutenticacaoTests.cs": 9,
+      "Dominio/PedidoTests.cs": 12,
+      "Dominio/PropostaTests.cs": 7,
+      "Dominio/AvaliacaoTests.cs": 7,
+      "Negociacao/EstrategiasTests.cs": 6,
+      "Servicos/ServicoPropostasTests.cs": 6,
+      "Dominio/ProdutoPropriedadeTests.cs": 5,
+      "Repositorios/RepositorioProdutoTests.cs": 5,
+      "Servicos/ServicoFavoritosTests.cs": 5,
+      "Dominio/FavoritoTests.cs": 3,
+      "Servicos/ServicoAnunciosCategoriaTests.cs": 3,
+      "Dominio/BuscaTextoTests.cs": 6,
+      "Servicos/ServicoAnunciosBuscaTests.cs": 12
+    }
+  },
+  "criterios": {
+    "total": 40,
+    "atendido": 39,
+    "parcial": 1,
+    "pendente": 0,
+    "parciais": [
+      {
+        "codigo": "E1",
+        "motivo": "comportamento antigo dos defeitos nao foi executado apos a reescrita"
+      }
+    ]
+  },
+  "evidenciasHttp": [
+    {
+      "metodo": "GET",
+      "rota": "/api/produtos",
+      "status": 200,
+      "observacao": "catalogo publico anonimo"
+    },
+    {
+      "metodo": "POST",
+      "rota": "/api/autenticacao/cadastrar",
+      "status": 200,
+      "observacao": "usuario criado e persistido"
+    },
+    {
+      "metodo": "POST",
+      "rota": "/api/autenticacao/cadastrar",
+      "status": 409,
+      "observacao": "e-mail duplicado"
+    },
+    {
+      "metodo": "PUT",
+      "rota": "/api/produtos/1",
+      "status": 403,
+      "observacao": "terceiro autenticado"
+    },
+    {
+      "metodo": "POST",
+      "rota": "/api/produtos",
+      "status": 400,
+      "observacao": "preco zero"
+    },
+    {
+      "metodo": "PATCH",
+      "rota": "/api/produtos/1/estado",
+      "status": 409,
+      "observacao": "vender anuncio pausado"
+    },
+    {
+      "metodo": "POST",
+      "rota": "/api/propostas/1/aceitar",
+      "status": 409,
+      "observacao": "PrecoFixo recusa oferta de 200"
+    },
+    {
+      "metodo": "POST",
+      "rota": "/api/propostas/2/aceitar",
+      "status": 200,
+      "observacao": "Liquidacao aceita a mesma oferta"
+    },
+    {
+      "metodo": "POST",
+      "rota": "/api/pedidos",
+      "status": 201,
+      "observacao": "snapshot: nomeProduto Funko Joker, precoUnitario 399.9"
+    },
+    {
+      "metodo": "POST",
+      "rota": "/api/pedidos/1/concluir",
+      "status": 403,
+      "observacao": "comprador tentando concluir"
+    },
+    {
+      "metodo": "POST",
+      "rota": "/api/pedidos/1/concluir",
+      "status": 200,
+      "observacao": "vendedor conclui; anuncio passa a Vendido"
+    },
+    {
+      "metodo": "POST",
+      "rota": "/api/avaliacoes",
+      "status": 201,
+      "observacao": "nota 5 do comprador"
+    },
+    {
+      "metodo": "POST",
+      "rota": "/api/avaliacoes",
+      "status": 409,
+      "observacao": "pedido ja avaliado"
+    },
+    {
+      "metodo": "GET",
+      "rota": "/api/avaliacoes/vendedor/1",
+      "status": 200,
+      "observacao": "media 5, total 1"
+    },
+    {
+      "metodo": "POST",
+      "rota": "/api/produtos/3/imagem",
+      "status": 200,
+      "observacao": "PNG aceito, retorna /uploads/{guid}.png"
+    },
+    {
+      "metodo": "GET",
+      "rota": "/uploads/{guid}.png",
+      "status": 200,
+      "observacao": "imagem servida com content-type image/png"
+    },
+    {
+      "metodo": "POST",
+      "rota": "/api/produtos/3/imagem",
+      "status": 400,
+      "observacao": "text/plain recusado"
+    },
+    {
+      "metodo": "POST",
+      "rota": "/api/produtos/3/imagem",
+      "status": 403,
+      "observacao": "terceiro tentando enviar imagem"
+    },
+    {
+      "metodo": "GET",
+      "rota": "/api/produtos",
+      "status": 200,
+      "observacao": "apos reinicio: dados mantidos"
+    },
+    {
+      "metodo": "POST",
+      "rota": "/api/autenticacao/cadastrar",
+      "status": 200,
+      "observacao": "tipoConta Comprador; /usuario-atual devolve o papel"
+    },
+    {
+      "metodo": "GET",
+      "rota": "/api/pedidos",
+      "status": 200,
+      "observacao": "conta nova devolve lista vazia"
+    },
+    {
+      "metodo": "POST",
+      "rota": "/api/produtos",
+      "status": 403,
+      "observacao": "conta de comprador nao publica"
+    },
+    {
+      "metodo": "POST",
+      "rota": "/api/pedidos",
+      "status": 201,
+      "observacao": "checkout com entrega e formaPagamento Pix"
+    },
+    {
+      "metodo": "POST",
+      "rota": "/api/pedidos",
+      "status": 400,
+      "observacao": "checkout sem endereco recusado"
+    },
+    {
+      "metodo": "POST",
+      "rota": "/api/pedidos",
+      "status": 403,
+      "observacao": "conta de vendedor nao compra"
+    },
+    {
+      "metodo": "POST",
+      "rota": "/api/produtos",
+      "status": 201,
+      "observacao": "franquia Dragon Ball, raridade Lendario, edicaoLimitada e destaque"
+    },
+    {
+      "metodo": "GET",
+      "rota": "/api/produtos?franquia=dragon ball",
+      "status": 200,
+      "observacao": "1 resultado"
+    },
+    {
+      "metodo": "GET",
+      "rota": "/api/produtos?destaque=true",
+      "status": 200,
+      "observacao": "1 resultado"
+    },
+    {
+      "metodo": "GET",
+      "rota": "/api/produtos?precoMin=500&precoMax=1000",
+      "status": 200,
+      "observacao": "2 resultados"
+    },
+    {
+      "metodo": "GET",
+      "rota": "/api/produtos?ordem=MenorPreco",
+      "status": 200,
+      "observacao": "249.93, 349.9, 399.9, 500, 899.9"
+    },
+    {
+      "metodo": "GET",
+      "rota": "/api/categorias",
+      "status": 200,
+      "observacao": "15 categorias geek da especificacao"
+    },
+    {
+      "metodo": "GET",
+      "rota": "/api/produtos?tamanhoPagina=2",
+      "status": 200,
+      "observacao": "X-Total-Count 6, 2 itens na pagina"
+    },
+    {
+      "metodo": "GET",
+      "rota": "/api/vendedores/1",
+      "status": 200,
+      "observacao": "perfil publico: reputacao 5/1, 4 anuncios ativos, 1 vendido"
+    },
+    {
+      "metodo": "POST",
+      "rota": "/api/propostas",
+      "status": 201,
+      "observacao": "proposta dispara notificacao para o vendedor"
+    },
+    {
+      "metodo": "GET",
+      "rota": "/api/notificacoes",
+      "status": 200,
+      "observacao": "naoLidas 1, tipo PropostaRecebida"
+    },
+    {
+      "metodo": "POST",
+      "rota": "/api/autenticacao/entrar",
+      "status": 200,
+      "observacao": "admin@rarityroom.com (conta de demonstracao)"
+    },
+    {
+      "metodo": "GET",
+      "rota": "/api/admin/resumo",
+      "status": 200,
+      "observacao": "7 usuarios, 5 anuncios ativos, 3 pedidos, R$ 399,90 vendidos"
+    },
+    {
+      "metodo": "GET",
+      "rota": "/api/admin/usuarios",
+      "status": 200,
+      "observacao": "lista com papel, situacao e flag de administrador"
+    },
+    {
+      "metodo": "GET",
+      "rota": "/api/admin/resumo",
+      "status": 403,
+      "observacao": "conta comum recebe acesso-negado"
+    },
+    {
+      "metodo": "POST",
+      "rota": "/api/pedidos/{id}/pagar",
+      "status": 200,
+      "observacao": "pagamento simulado aprovado: estado Pago, statusPagamento Pago"
+    },
+    {
+      "metodo": "POST",
+      "rota": "/api/pedidos/{id}/enviar",
+      "status": 200,
+      "observacao": "vendedor marca envio apos pagamento"
+    },
+    {
+      "metodo": "POST",
+      "rota": "/api/pedidos/{id}/entregar",
+      "status": 200,
+      "observacao": "comprador confirma entrega: estado Entregue"
+    },
+    {
+      "metodo": "POST",
+      "rota": "/api/pedidos/{id}/enviar",
+      "status": 409,
+      "observacao": "envio antes do pagamento recusado"
+    },
+    {
+      "metodo": "POST",
+      "rota": "/api/pedidos/{id}/pagar",
+      "status": 409,
+      "observacao": "pagamento recusado: codigo pagamento-recusado, status persistido"
+    },
+    {
+      "metodo": "GET",
+      "rota": "/api/avaliacoes/produto/{id}",
+      "status": 200,
+      "observacao": "produto 2: media 5, total 1 (backfill das avaliacoes antigas)"
+    },
+    {
+      "metodo": "GET",
+      "rota": "/api/avaliacoes/produto/{id}",
+      "status": 200,
+      "observacao": "produto sem venda: media 0, total 0"
+    },
+    {
+      "metodo": "POST",
+      "rota": "/api/lojas",
+      "status": 201,
+      "observacao": "vendedor cria loja"
+    },
+    {
+      "metodo": "PUT",
+      "rota": "/api/lojas",
+      "status": 200,
+      "observacao": "nome e descricao com acento em UTF-8"
+    },
+    {
+      "metodo": "POST",
+      "rota": "/api/lojas",
+      "status": 409,
+      "observacao": "segunda loja recusada"
+    },
+    {
+      "metodo": "POST",
+      "rota": "/api/lojas",
+      "status": 403,
+      "observacao": "conta de comprador nao pode ter loja"
+    },
+    {
+      "metodo": "GET",
+      "rota": "/api/vendedores/1",
+      "status": 200,
+      "observacao": "perfil inclui a loja (nome, descricao, foto)"
+    },
+    {
+      "metodo": "GET",
+      "rota": "/api/perfil",
+      "status": 200,
+      "observacao": "nome, email, foto e tipo de conta"
+    },
+    {
+      "metodo": "PUT",
+      "rota": "/api/perfil/nome",
+      "status": 200,
+      "observacao": "altera nome do usuario"
+    },
+    {
+      "metodo": "POST",
+      "rota": "/api/enderecos",
+      "status": 201,
+      "observacao": "primeiro endereco vira principal (São Paulo)"
+    },
+    {
+      "metodo": "DELETE",
+      "rota": "/api/enderecos/{id}",
+      "status": 204,
+      "observacao": "remove principal e promove outro"
+    },
+    {
+      "metodo": "POST",
+      "rota": "/api/autenticacao/recuperar-senha",
+      "status": 200,
+      "observacao": "token de demonstracao gerado"
+    },
+    {
+      "metodo": "POST",
+      "rota": "/api/autenticacao/redefinir-senha",
+      "status": 200,
+      "observacao": "senha antiga passa a dar 401, nova da 200"
+    },
+    {
+      "metodo": "POST",
+      "rota": "/api/autenticacao/redefinir-senha",
+      "status": 400,
+      "observacao": "token reutilizado e recusado"
+    },
+    {
+      "metodo": "POST",
+      "rota": "/api/autenticacao/cadastrar",
+      "status": 200,
+      "observacao": "sem campo tipoConta: toda conta nasce compradora e vendedora"
+    },
+    {
+      "metodo": "POST",
+      "rota": "/api/produtos",
+      "status": 201,
+      "observacao": "conta criada sem tipoConta publica anuncio"
+    },
+    {
+      "metodo": "POST",
+      "rota": "/api/pedidos",
+      "status": 201,
+      "observacao": "a mesma conta compra o anuncio de outra e vende o seu"
+    },
+    {
+      "metodo": "POST",
+      "rota": "/api/lojas",
+      "status": 201,
+      "observacao": "qualquer conta cria loja"
+    }
+  ],
+  "codigo": {
+    "arquivosBackend": 74,
+    "linhasBackend": 5181,
+    "arquivosTestes": 25,
+    "linhasTestes": 2333,
+    "classesDeDominio": 7,
+    "implementacoesDeEstrategia": 3,
+    "tiposDeExcecao": 6,
+    "migracoes": 5,
+    "endpointsHttp": 24
+  },
+  "limitacoes": [
+    "sem paginacao ou busca no servidor",
+    "sem teste contra PostgreSQL ou SQL Server",
+    "upload aceita apenas JPG, PNG e WEBP de ate 2 MB",
+    "pagamento e envio fora do escopo"
+  ]
+}

@@ -5,6 +5,8 @@ using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 
 using RarityRoom.Modelos;
+using RarityRoom.Modelos.Enums;
+using RarityRoom.Modelos.Excecoes;
 using RarityRoom.Servicos;
 
 namespace RarityRoom.Controllers;
@@ -15,41 +17,71 @@ public class AutenticacaoController : ControllerBase
 {
     private readonly IServicoAutenticacao servicoAutenticacao;
 
+    private readonly IServicoRecuperacaoSenha servicoRecuperacaoSenha;
+
     public AutenticacaoController(
-        IServicoAutenticacao servicoAutenticacao)
+        IServicoAutenticacao servicoAutenticacao,
+        IServicoRecuperacaoSenha servicoRecuperacaoSenha)
     {
         this.servicoAutenticacao = servicoAutenticacao;
+        this.servicoRecuperacaoSenha = servicoRecuperacaoSenha;
     }
 
+    /// <summary>
+    /// Gera o token de redefinição. Não há provedor de e-mail configurado:
+    /// o token volta na resposta, marcado como demonstração.
+    /// </summary>
+    [HttpPost("recuperar-senha")]
+    [AllowAnonymous]
+    public IActionResult RecuperarSenha(ModeloRecuperacao modelo)
+    {
+        string? token = servicoRecuperacaoSenha.Solicitar(modelo.Email);
+
+        return Ok(new
+        {
+            mensagem = token == null
+                ? "Se este e-mail estiver cadastrado, um token foi gerado."
+                : "Token gerado. Use-o para definir a nova senha.",
+            demonstracao = true,
+            token
+        });
+    }
+
+    [HttpPost("redefinir-senha")]
+    [AllowAnonymous]
+    public IActionResult RedefinirSenha(ModeloRedefinicao modelo)
+    {
+        servicoRecuperacaoSenha.Redefinir(
+            modelo.Email,
+            modelo.Token,
+            modelo.NovaSenha);
+
+        return Ok(new { mensagem = "Senha redefinida com sucesso." });
+    }
+
+    /// <summary>
+    /// Sem try/catch local: o middleware de exceções traduz o conflito de
+    /// e-mail duplicado em 409 com código estável.
+    /// </summary>
     [HttpPost("cadastrar")]
     public IActionResult Cadastrar(ModeloCadastro modelo)
     {
-        try
-        {
-            var usuario = servicoAutenticacao.Cadastrar(
-                modelo.Nome,
-                modelo.Email,
-                modelo.Senha
-            );
+        var usuario = servicoAutenticacao.Cadastrar(
+            modelo.Nome,
+            modelo.Email,
+            modelo.Senha
+        );
 
-            return Ok(new
-            {
-                mensagem = "Usuário cadastrado com sucesso.",
-                usuario = new
-                {
-                    usuario.Id,
-                    usuario.Nome,
-                    usuario.Email
-                }
-            });
-        }
-        catch (InvalidOperationException ex)
+        return Ok(new
         {
-            return Conflict(new
+            mensagem = "Usuário cadastrado com sucesso.",
+            usuario = new
             {
-                mensagem = ex.Message
-            });
-        }
+                usuario.Id,
+                usuario.Nome,
+                usuario.Email
+            }
+        });
     }
 
     [HttpPost("entrar")]
@@ -83,18 +115,24 @@ public class AutenticacaoController : ControllerBase
             new Claim(
                 ClaimTypes.Email,
                 usuario.Email
-            )
+            ),
+
+            new Claim("tipoConta", usuario.TipoConta.ToString()),
+
+            new Claim(
+                "administrador",
+                usuario.Administrador ? "true" : "false")
         };
 
         var identidade = new ClaimsIdentity(
             claims,
-            Microsoft.AspNetCore.Authentication.Cookies.CookieAuthenticationDefaults.AuthenticationScheme
-);
+            CookieAuthenticationDefaults.AuthenticationScheme
+        );
 
         var principal = new ClaimsPrincipal(identidade);
 
         await HttpContext.SignInAsync(
-            Microsoft.AspNetCore.Authentication.Cookies.CookieAuthenticationDefaults.AuthenticationScheme,
+            CookieAuthenticationDefaults.AuthenticationScheme,
             principal
         );
 
@@ -115,7 +153,7 @@ public class AutenticacaoController : ControllerBase
     public async Task<IActionResult> Sair()
     {
         await HttpContext.SignOutAsync(
-            Microsoft.AspNetCore.Authentication.Cookies.CookieAuthenticationDefaults.AuthenticationScheme
+            CookieAuthenticationDefaults.AuthenticationScheme
         );
 
         return Ok(new
@@ -140,8 +178,16 @@ public class AutenticacaoController : ControllerBase
 
             email = User.FindFirstValue(
                 ClaimTypes.Email
-            )
+            ),
+
+            tipoConta = User.FindFirstValue("tipoConta"),
+
+            administrador =
+                User.FindFirstValue("administrador") == "true"
         });
     }
 
+    /// <summary>
+    /// Vazio assume "Ambos" para não quebrar clientes antigos.
+    /// </summary>
 }

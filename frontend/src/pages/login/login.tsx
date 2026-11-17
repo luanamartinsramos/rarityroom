@@ -228,9 +228,7 @@ function Login() {
               <div className="password-label">
                 <label htmlFor="password">SENHA</label>
 
-                <a href="#" onClick={(event) => event.preventDefault()}>
-                  Esqueceu a senha?
-                </a>
+                <Link to="/recuperar-senha">Esqueceu a senha?</Link>
               </div>
 
               <div className="input-wrapper">

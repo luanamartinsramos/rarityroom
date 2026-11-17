@@ -11,4 +11,6 @@ public interface IRepositorioUsuario
     List<Usuario> ObterTodos();
 
     Usuario Adicionar(Usuario usuario);
+
+    bool Atualizar(Usuario usuario);
 }
