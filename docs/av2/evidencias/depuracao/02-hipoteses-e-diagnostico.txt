@@ -1,0 +1,15 @@
+### H3 — dois vendedores, com log de diagnóstico
+== POST /api/pedidos (2 vendedores)
+{"title":"Erro interno","status":500,"detail":"Ocorreu um erro inesperado. Tente novamente.","instance":"/api/pedidos","codigo":"erro-interno"}
+HTTP 500
+
+[diag] vendedor=2 entrega#=63665143
+[diag] vendedor=3 entrega#=63665143
+### Estado do banco após a falha (transação desfeita?)
+pagamentos 0
+pedidos 0
+itens_pedido 0
+itens_carrinho 2
+### H1 — mesmo endereço, carrinho com UM vendedor
+HTTP 201
+[diag] vendedor=2 entrega#=9982135

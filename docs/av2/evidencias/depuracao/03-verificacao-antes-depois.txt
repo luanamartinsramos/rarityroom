@@ -1,0 +1,10 @@
+### ANTES (defeito reintroduzido) — teste de regressão
+  Com falha RarityRoom.Tests.Api.MarketplaceApiTests.CarrinhoComDoisVendedores_GeraUmPedidoPorVendedor [3 s]
+   {"title":"Erro interno","status":500,"detail":"Ocorreu um erro inesperado. Tente novamente.","instance":"/api/pedidos","codigo":"erro-interno"}
+Com falha! – Com falha:     1, Aprovado:     0, Ignorado:     0, Total:     1, Duração: 3 s - RarityRoom.Tests.dll (net10.0)
+### DEPOIS (código corrigido) — teste de regressão
+Aprovado!  – Com falha:     0, Aprovado:     1, Ignorado:     0, Total:     1, Duração: 3 s - RarityRoom.Tests.dll (net10.0)
+### DEPOIS — mesmo roteiro HTTP
+== POST /api/pedidos (2 vendedores)
+HTTP 201 | pedidos: 2
+erros no log: 0

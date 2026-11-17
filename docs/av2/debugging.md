@@ -1,6 +1,130 @@
 # Debugging
 
-Registro dos defeitos investigados, com sintoma, causa e correção.
+A **seção A** documenta a investigação completa de um defeito reproduzível,
+com as evidências salvas em `docs/av2/evidencias/depuracao/`. A **seção B**
+mantém o registro histórico de defeitos e episódios anteriores.
+
+# A. Investigação principal — 500 ao finalizar compra com dois vendedores
+
+## A1. Defeito e evidência do comportamento incorreto (E01)
+
+**Defeito real**, observado durante o desenvolvimento do checkout. O teste
+`CarrinhoComDoisVendedores_GeraUmPedidoPorVendedor` falhou com HTTP 500. A
+correção entrou no commit `1b32db1`. Para registrar evidências reproduzíveis,
+o defeito foi **reintroduzido de forma controlada** numa cópia isolada do
+repositório (`git worktree`), trocando uma única linha de
+`ServicoPedidos.Finalizar`:
+
+```diff
+-                    entrega with { },
++                    entrega,
+```
+
+Evidência do comportamento incorreto:
+- resposta HTTP 500 em
+  [`02-hipoteses-e-diagnostico.txt`](evidencias/depuracao/02-hipoteses-e-diagnostico.txt);
+- exceção completa no log do servidor em
+  [`01-log-servidor-com-defeito.txt`](evidencias/depuracao/01-log-servidor-com-defeito.txt).
+
+## A2. Reprodução, esperado e observado (E02)
+
+**Condições de reprodução** — script
+[`reproduzir.sh`](evidencias/depuracao/reproduzir.sh), com o backend em
+`http://localhost:5055` e um banco SQLite vazio:
+
+1. cadastrar e entrar com três contas: Ana e Carlos (vendedores) e Bruno (comprador);
+2. Ana anuncia "Item da Ana" (R$ 10) e Carlos anuncia "Item do Carlos" (R$ 20);
+3. Bruno coloca **um item de cada vendedor** no carrinho;
+4. Bruno faz `POST /api/pedidos` com endereço válido e forma `Pix`.
+
+| | Resultado |
+|---|---|
+| **Esperado** (FL3, decisão DA1) | 201 Created; uma compra `Pendente` de R$ 30 com **2 pedidos**, um para cada vendedor |
+| **Observado** | 500 `erro-interno`; nenhuma compra criada |
+
+## A3. Hipóteses e evidências (E03)
+
+| Hipótese | Teste realizado | Evidência | Resultado |
+|---|---|---|---|
+| H1 — o endereço é inválido para o EF (tamanho, campo nulo) | mesmo endereço, carrinho com **um** vendedor | `HTTP 201` em `02-hipoteses…` | **descartada** |
+| H2 — conflito de concorrência no estoque | ler o tipo da exceção no log | `System.InvalidOperationException` (não `DbUpdateConcurrencyException`); além disso, o checkout não grava estoque | **descartada** |
+| H3 — a **mesma instância** de `DadosEntrega` (tipo *owned* do EF) está sendo atribuída aos dois pedidos; ao salvar o segundo, o EF tenta trocar o dono (`PedidoId`) da entrega já rastreada | (a) stack trace aponta `RepositorioPedidoEf.Adicionar` chamado de `ServicoPedidos.cs:line 192`, o laço `foreach (var grupo …)` que cria um pedido por vendedor; (b) mensagem: `The property 'DadosEntrega.PedidoId' is part of a key and so cannot be modified`; (c) log de diagnóstico mostra **o mesmo objeto** nos dois pedidos: `[diag] vendedor=2 entrega#=63665143` / `[diag] vendedor=3 entrega#=63665143` | **confirmada** |
+
+A investigação reduziu o espaço de busca em etapas: primeiro a camada (a
+exceção sai do repositório, não do domínio), depois a iteração (só o segundo
+pedido falha) e por fim o objeto (identidade compartilhada).
+
+## A4. Técnicas de depuração aplicadas (E04)
+
+1. **Análise de logs:** o `MiddlewareExcecoes` registra a exceção completa
+   com `LogError`. O log de produção (`01-log-servidor-com-defeito.txt`)
+   trouxe o tipo, a mensagem do EF e o stack trace até a linha do serviço.
+2. **Rastreamento da execução pelo stack trace:**
+   `PedidosController.Finalizar` → `ServicoPedidos.Finalizar` (linha 125) →
+   `UnidadeDeTrabalhoEf.Executar` → lambda de `Finalizar` (linha 192) →
+   `RepositorioPedidoEf.Adicionar` (linha 59) → `SaveChanges`.
+3. **Inspeção de variável por log temporário:** antes de cada `Adicionar`
+   foi impresso o *hash* de identidade do objeto de endereço
+   (`RuntimeHelpers.GetHashCode(entrega)`). O mesmo valor nos dois pedidos
+   provou o compartilhamento. O log temporário existiu só na cópia isolada e
+   não foi para o repositório.
+4. **Inspeção do estado persistido:** contagem das tabelas após a falha
+   (`pagamentos 0`, `pedidos 0`, `itens_pedido 0`, `itens_carrinho 2`). A
+   transação foi desfeita e o carrinho preservado.
+
+## A5. Causa raiz, correção e eliminação (E05)
+
+**Causa raiz:** `DadosEntrega` é um *owned type* mapeado com `OwnsOne`. Para
+o EF, cada instância pertence a **um único** pedido (a chave dela é o
+`PedidoId`). O laço reutilizava o mesmo objeto `entrega`, recebido do
+controller, para todos os pedidos do checkout. O problema não estava na
+linha que falha (`SaveChanges`), mas na **identidade compartilhada** criada
+no serviço: "não confundir causa com localização".
+
+**Correção (menor correção coerente):** cada pedido recebe uma cópia do
+*record* (`entrega with { }`), com os mesmos valores e outra instância. O
+comentário no código explica o motivo:
+
+```csharp
+// Cada pedido guarda a própria cópia do endereço (o EF não
+// permite compartilhar a mesma instância entre pedidos).
+entrega with { },
+```
+
+**Comportamento eliminado:** o mesmo roteiro devolve `HTTP 201 | pedidos: 2`
+e `erros no log: 0` (`03-verificacao-antes-depois.txt`).
+
+## A6. Verificação antes/depois e comparação de técnicas (E06)
+
+| | Antes (defeito) | Depois (corrigido) |
+|---|---|---|
+| Teste de regressão `CarrinhoComDoisVendedores_GeraUmPedidoPorVendedor` | **Com falha: 1** — resposta 500 | **Aprovado: 1** |
+| Roteiro HTTP `reproduzir.sh` | 500, nenhuma compra | 201, 2 pedidos |
+| Log do servidor | `fail: … InvalidOperationException` | 0 `fail:` |
+| Suíte completa | — | todos aprovados (não regressão) |
+
+Fonte: [`03-verificacao-antes-depois.txt`](evidencias/depuracao/03-verificacao-antes-depois.txt).
+O teste de regressão permanece na suíte e impede o retorno do defeito.
+
+**Comparação: análise de logs × breakpoint no depurador**
+
+| Critério | Análise de logs + diagnóstico temporário (usada) | Breakpoint no `foreach` de `Finalizar` (alternativa) |
+|---|---|---|
+| Ambiente | funciona com o servidor rodando normalmente e em CI | exige IDE com depurador anexado ao processo |
+| Reprodutibilidade | a evidência fica salva em arquivo e anexada ao repositório | a observação é efêmera (só quem depurou viu) |
+| Custo para confirmar H3 | uma linha de log temporária e uma nova execução | inspecionar `entrega` nas duas iterações e comparar com *Make Object ID*; mais rápido para quem já está no depurador |
+| Risco | o log temporário precisa ser removido (feito: só na cópia isolada) | nenhum código alterado |
+| Profundidade | mostra o que foi registrado | permite explorar o *change tracker* do EF ao vivo |
+
+**Recomendação:** para este defeito, análise de logs. O stack trace do log
+de produção já localizava a linha e a mensagem do EF sugeria a hipótese; o
+log temporário apenas confirmou a identidade. O breakpoint seria preferível
+se o stack trace não existisse (falha silenciosa) ou se fosse preciso
+navegar pelo estado interno do EF.
+
+---
+
+# B. Registro histórico
 
 ## 1. Método
 
