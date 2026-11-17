@@ -14,6 +14,7 @@ public class AvaliacaoTests
 
         var pedido = NovoPedido(produto, compradorId);
         pedido.DefinirId(20);
+        pedido.ConfirmarPagamento(DateTime.UtcNow);
         pedido.Concluir();
 
         return pedido;
@@ -58,6 +59,13 @@ public class AvaliacaoTests
     }
 
     [Fact]
+    public void Construtor_ProdutoForaDoPedido_DeveFalhar()
+    {
+        Assert.Throws<ValidacaoException>(
+            () => new Avaliacao(PedidoConcluido(), 2, 5, string.Empty, produtoId: 999));
+    }
+
+    [Fact]
     public void Construtor_AutorQueNaoComprou_DeveNegar()
     {
         Assert.Throws<AcessoNegadoException>(
@@ -85,8 +93,9 @@ public class AvaliacaoTests
     private static Pedido NovoPedido(Produto produto, int compradorId)
     {
         return new Pedido(
-            produto,
             compradorId,
+            produto.UsuarioId,
+            new[] { new ItemPedido(produto, 1, produto.Preco) },
             Apoio.Entrega(),
             FormaPagamento.Pix);
     }
