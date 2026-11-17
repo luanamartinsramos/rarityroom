@@ -1,4 +1,6 @@
 using RarityRoom.Modelos;
+using RarityRoom.Modelos.Enums;
+using RarityRoom.Modelos.Excecoes;
 using RarityRoom.Repositorios;
 
 namespace RarityRoom.Servicos;
@@ -19,6 +21,11 @@ public class ServicoAutenticacao : IServicoAutenticacao
 
     public bool EmailExiste(string email)
     {
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            return false;
+        }
+
         return repositorioUsuario.ObterPorEmail(email) != null;
     }
 
@@ -27,17 +34,20 @@ public class ServicoAutenticacao : IServicoAutenticacao
         string email,
         string senha)
     {
+        Usuario.ValidarSenha(senha);
+
         if (EmailExiste(email))
         {
-            throw new InvalidOperationException(
+            throw new ConflitoException(
                 "Este e-mail já está cadastrado.");
         }
 
+        // Toda conta nasce compradora e vendedora (escopo do marketplace).
         var usuario = new Usuario(
-            id: repositorioUsuario.ObterTodos().Count + 1,
-            nome: nome,
-            email: email,
-            senhaHash: hashSenha.CriarHash(senha)
+            nome,
+            email,
+            hashSenha.CriarHash(senha),
+            TipoConta.Ambos
         );
 
         return repositorioUsuario.Adicionar(usuario);
@@ -47,24 +57,19 @@ public class ServicoAutenticacao : IServicoAutenticacao
         string email,
         string senha)
     {
+        if (string.IsNullOrWhiteSpace(email) || string.IsNullOrEmpty(senha))
+        {
+            return null;
+        }
+
         var usuario = repositorioUsuario.ObterPorEmail(email);
 
-        if (usuario == null)
+        if (usuario == null || !usuario.Ativo)
         {
             return null;
         }
 
-        if (!usuario.Ativo)
-        {
-            return null;
-        }
-
-        bool senhaValida = hashSenha.VerificarSenha(
-            senha,
-            usuario.SenhaHash
-        );
-
-        if (!senhaValida)
+        if (!hashSenha.VerificarSenha(senha, usuario.SenhaHash))
         {
             return null;
         }
