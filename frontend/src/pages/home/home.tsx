@@ -1,21 +1,35 @@
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 import {
   obterCategorias,
+  obterMeusProdutos,
+  obterPaginaProdutos,
+  ORDENS,
   type Produto,
-  obterProdutos,
   type FiltroProdutos,
 } from "../../services/produtosService";
 import {
-  criarPedido,
   obterPedidos,
+  ROTULO_PEDIDO,
   type PedidoApi,
 } from "../../services/pedidosService";
 import { obterNotificacoes } from "../../services/notificacoesService";
+import { obterCarrinho, ouvirCarrinho } from "../../services/carrinhoService";
+import { adicionarComAviso } from "../../services/carrinhoAcoes";
+import {
+  adicionarFavorito,
+  obterFavoritos,
+  removerFavorito,
+} from "../../services/favoritosService";
+import { estrelas, data, moeda, urlImagem } from "../../utils/formato";
+import { etapaAtual, NOMES_ETAPAS } from "../pedidos/rotulos";
 
 import "./home.css";
+import "../shared/compra.css";
+
+const TAMANHO_PAGINA = 12;
 
 interface Usuario {
   id: string;
@@ -37,19 +51,6 @@ interface ProdutoForm {
   imagemUrl: string;
 }
 
-interface CarrinhoItem extends Produto {
-  quantidade: number;
-}
-
-interface Pedido {
-  id: string;
-  produto: string;
-  quantidade: number;
-  total: number;
-  status: string;
-  data: string;
-}
-
 // Paleta visual aplicada às categorias vindas do catálogo do backend.
 const paletaCategorias = [
   { descricao: "Jogos e acessórios", icon: "🎮", classe: "category-purple" },
@@ -58,35 +59,6 @@ const paletaCategorias = [
   { descricao: "Animes e mangás", icon: "👾", classe: "category-red" },
   { descricao: "Bonecos e estátuas", icon: "🧸", classe: "category-pink" },
 ];
-
-function mapearPedido(pedido: PedidoApi): Pedido {
-  const status =
-    pedido.estado === "Concluido"
-      ? "Concluído"
-      : pedido.estado === "Cancelado"
-        ? "Cancelado"
-        : "Pedido realizado";
-
-  return {
-    id: "RR-" + String(pedido.id).padStart(5, "0"),
-    produto: pedido.nomeProduto,
-    quantidade: 1,
-    total: pedido.precoUnitario,
-    status,
-    data: new Date(pedido.criadoEm).toLocaleDateString("pt-BR"),
-  };
-}
-
-const emptyCheckout = {
-  cep: "",
-  logradouro: "",
-  numero: "",
-  complemento: "",
-  bairro: "",
-  cidade: "",
-  estado: "",
-  formaPagamento: "Pix",
-};
 
 const emptyForm: ProdutoForm = {
   nome: "",
@@ -106,28 +78,39 @@ function Home() {
   const [user, setUser] = useState<Usuario | null>(null);
   const [loadingUser, setLoadingUser] = useState(true);
 
-  const [products, setProducts] = useState<Produto[]>([]);
+  const [meusProdutos, setMeusProdutos] = useState<Produto[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(true);
 
-  const [search, setSearch] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("Todos");
+  // Critérios da pesquisa ficam na URL: voltar da página de um produto
+  // (ou recarregar) mantém termo, categoria, ordenação, filtros e página.
+  const [parametros, setParametros] = useSearchParams();
+
+  const termoUrl = parametros.get("q") ?? "";
+  const selectedCategory = parametros.get("categoria") ?? "Todos";
+  const ordem = parametros.get("ordem") ?? "Relevancia";
+  const pagina = Math.max(1, Number(parametros.get("pagina") ?? "1") || 1);
+  const precoMinUrl = parametros.get("min") ?? "";
+  const precoMaxUrl = parametros.get("max") ?? "";
+  const somenteDestaque = parametros.get("destaque") === "1";
+
+  // Campos digitados: viram parâmetros da URL após uma pausa curta.
+  const [search, setSearch] = useState(termoUrl);
+  const [precoMin, setPrecoMin] = useState(precoMinUrl);
+  const [precoMax, setPrecoMax] = useState(precoMaxUrl);
 
   const [categorias, setCategorias] = useState<
     { nome: string; descricao: string; icon: string; classe: string }[]
   >([]);
 
-  const [ordem, setOrdem] = useState("Relevancia");
-  const [precoMin, setPrecoMin] = useState("");
-  const [precoMax, setPrecoMax] = useState("");
-  const [somenteDestaque, setSomenteDestaque] = useState(false);
-
   const [searchResults, setSearchResults] = useState<Produto[]>([]);
+  const [totalResultados, setTotalResultados] = useState(0);
   const [searching, setSearching] = useState(false);
+  const [recarga, setRecarga] = useState(0);
 
-  const [favorites, setFavorites] = useState<number[]>([]);
-  const [cart, setCart] = useState<CarrinhoItem[]>([]);
+  const [favoriteProducts, setFavoriteProducts] = useState<Produto[]>([]);
+  const favorites = favoriteProducts.map((produto) => produto.id);
+  const [cartQuantity, setCartQuantity] = useState(0);
 
-  const [showCart, setShowCart] = useState(false);
   const [showFavorites, setShowFavorites] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
 
@@ -140,15 +123,68 @@ function Home() {
 
   const [savingProduct, setSavingProduct] = useState(false);
 
-  const [orders, setOrders] = useState<Pedido[]>([]);
+  const [orders, setOrders] = useState<PedidoApi[]>([]);
 
   const [showSeller, setShowSeller] = useState(false);
 
   const [naoLidas, setNaoLidas] = useState(0);
 
-  const [showCheckout, setShowCheckout] = useState(false);
-  const [checkoutForm, setCheckoutForm] = useState(emptyCheckout);
-  const [enviandoPedido, setEnviandoPedido] = useState(false);
+  function atualizarParametros(
+    mudancas: Record<string, string | null>,
+    manterPagina = false,
+  ) {
+    setParametros(
+      (atuais) => {
+        const novos = new URLSearchParams(atuais);
+
+        for (const [chave, valor] of Object.entries(mudancas)) {
+          if (valor === null || valor === "") {
+            novos.delete(chave);
+          } else {
+            novos.set(chave, valor);
+          }
+        }
+
+        if (!manterPagina) {
+          novos.delete("pagina");
+        }
+
+        return novos;
+      },
+      { replace: true },
+    );
+  }
+
+  function setSelectedCategory(categoria: string) {
+    atualizarParametros({ categoria: categoria === "Todos" ? null : categoria });
+  }
+
+  function setOrdem(valor: string) {
+    atualizarParametros({ ordem: valor === "Relevancia" ? null : valor });
+  }
+
+  function irParaPagina(numero: number) {
+    atualizarParametros({ pagina: numero > 1 ? String(numero) : null }, true);
+    scrollToProducts();
+  }
+
+  function limparPesquisa() {
+    setSearch("");
+    setPrecoMin("");
+    setPrecoMax("");
+    setParametros(new URLSearchParams(), { replace: true });
+  }
+
+  function limparSoOTermo() {
+    setSearch("");
+    atualizarParametros({ q: null });
+  }
+
+  const meuId = Number(user?.id ?? 0);
+
+  function ehMeu(produto: Produto) {
+    return produto.usuarioId === meuId;
+  }
 
   useEffect(() => {
     async function loadUser() {
@@ -180,23 +216,27 @@ function Home() {
   }, [navigate]);
 
   async function loadProducts() {
-    try {
-      setLoadingProducts(true);
+    setRecarga((atual) => atual + 1);
 
-      const data = await obterProdutos();
-
-      setProducts(data);
-      setSearchResults(data);
-    } catch {
-      toast.error("Não foi possível carregar os produtos.");
-    } finally {
-      setLoadingProducts(false);
-    }
+    obterMeusProdutos()
+      .then(setMeusProdutos)
+      .catch(() => setMeusProdutos([]));
   }
 
+  // Favoritos e contador do carrinho vêm do servidor.
   useEffect(() => {
-    loadProducts();
-  }, []);
+    if (!user) {
+      return;
+    }
+
+    obterFavoritos().then(setFavoriteProducts).catch(() => setFavoriteProducts([]));
+    obterMeusProdutos().then(setMeusProdutos).catch(() => setMeusProdutos([]));
+    obterCarrinho()
+      .then((carrinho) => setCartQuantity(carrinho.quantidadeItens))
+      .catch(() => setCartQuantity(0));
+
+    return ouvirCarrinho((carrinho) => setCartQuantity(carrinho.quantidadeItens));
+  }, [user]);
 
   async function handleLogout() {
     try {
@@ -225,72 +265,27 @@ function Home() {
     document.getElementById("products")?.scrollIntoView({ behavior: "smooth" });
   }
 
-  function scrollToOrders() {
+  async function toggleFavorite(product: Produto) {
+    const favoritado = favorites.includes(product.id);
 
-    setTimeout(() => {
-      document.getElementById("orders")?.scrollIntoView({ behavior: "smooth" });
-    }, 50);
-  }
-
-  function toggleFavorite(productId: number) {
-    setFavorites((current) => {
-      if (current.includes(productId)) {
+    try {
+      if (favoritado) {
+        await removerFavorito(product.id);
+        setFavoriteProducts((atual) => atual.filter((item) => item.id !== product.id));
         toast("Removido dos favoritos.");
-        return current.filter((id) => id !== productId);
+      } else {
+        await adicionarFavorito(product.id);
+        setFavoriteProducts((atual) => [...atual, product]);
+        toast.success("Adicionado aos favoritos! ♡");
       }
-
-      toast.success("Adicionado aos favoritos! ♡");
-      return [...current, productId];
-    });
-  }
-
-  function addToCart(product: Produto) {
-    setCart((current) => {
-      const existing = current.find((item) => item.id === product.id);
-
-      if (existing) {
-        return current.map((item) =>
-          item.id === product.id
-            ? {
-                ...item,
-                quantidade: item.quantidade + 1,
-              }
-            : item,
-        );
-      }
-
-      return [
-        ...current,
-        {
-          ...product,
-          quantidade: 1,
-        },
-      ];
-    });
-
-    toast.success(`${product.nome} foi para o carrinho! 🛒`);
-  }
-
-  function removeFromCart(productId: number) {
-    setCart((current) => current.filter((item) => item.id !== productId));
-  }
-
-  function changeCartQuantity(productId: number, quantidade: number) {
-    if (quantidade <= 0) {
-      removeFromCart(productId);
-      return;
+    } catch (falha) {
+      toast.error(falha instanceof Error ? falha.message : "Não foi possível atualizar o favorito.");
     }
+  }
 
-    setCart((current) =>
-      current.map((item) =>
-        item.id === productId
-          ? {
-              ...item,
-              quantidade,
-            }
-          : item,
-      ),
-    );
+  /** Mesma ação usada na página do produto (ver carrinhoAcoes). */
+  function addToCart(product: Produto) {
+    void adicionarComAviso(product, 1);
   }
 
   function openEditProduct(product: Produto) {
@@ -365,7 +360,7 @@ function Home() {
       if (!response.ok) {
         const error = await response.json().catch(() => null);
 
-        toast.error(error?.mensagem || "Não foi possível salvar o produto.");
+        toast.error(error?.detail || error?.mensagem || "Não foi possível salvar o produto.");
 
         return;
       }
@@ -409,18 +404,14 @@ function Home() {
       if (!response.ok) {
         const error = await response.json().catch(() => null);
 
-        toast.error(error?.mensagem || "Não foi possível excluir o produto.");
+        toast.error(error?.detail || error?.mensagem || "Não foi possível excluir o produto.");
 
         return;
       }
 
-      setProducts((current) =>
-        current.filter((product) => product.id !== productId),
-      );
+      setFavoriteProducts((current) => current.filter((item) => item.id !== productId));
 
-      setFavorites((current) => current.filter((id) => id !== productId));
-
-      setCart((current) => current.filter((item) => item.id !== productId));
+      await loadProducts();
 
       toast.success("Produto excluído com sucesso.");
     } catch {
@@ -428,37 +419,66 @@ function Home() {
     }
   }
 
-  // Pesquisa no servidor, com espera curta para não disparar a cada tecla.
+  // Texto digitado → URL, com espera curta para não pesquisar a cada tecla.
   useEffect(() => {
     const temporizador = setTimeout(() => {
-      setSearching(true);
+      const mudancas: Record<string, string | null> = {};
 
-      const filtro: FiltroProdutos = { termo: search, ordem };
+      if (search.trim() !== termoUrl) mudancas.q = search.trim() || null;
+      if (precoMin.trim() !== precoMinUrl) mudancas.min = precoMin.trim() || null;
+      if (precoMax.trim() !== precoMaxUrl) mudancas.max = precoMax.trim() || null;
 
-      if (selectedCategory !== "Todos") {
-        filtro.categoria = selectedCategory;
+      if (Object.keys(mudancas).length > 0) {
+        atualizarParametros(mudancas);
       }
-
-      if (precoMin.trim().length > 0) {
-        filtro.precoMin = Number(precoMin.replace(",", "."));
-      }
-
-      if (precoMax.trim().length > 0) {
-        filtro.precoMax = Number(precoMax.replace(",", "."));
-      }
-
-      if (somenteDestaque) {
-        filtro.destaque = true;
-      }
-
-      obterProdutos(filtro)
-        .then(setSearchResults)
-        .catch(() => toast.error("Não foi possível pesquisar."))
-        .finally(() => setSearching(false));
-    }, 300);
+    }, 350);
 
     return () => clearTimeout(temporizador);
-  }, [search, selectedCategory, ordem, precoMin, precoMax, somenteDestaque, products]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search, precoMin, precoMax]);
+
+  // Pesquisa no servidor sempre que um critério da URL muda.
+  useEffect(() => {
+    let cancelado = false;
+
+    setSearching(true);
+
+    const filtro: FiltroProdutos = {
+      termo: termoUrl,
+      ordem,
+      pagina,
+      tamanhoPagina: TAMANHO_PAGINA,
+    };
+
+    if (selectedCategory !== "Todos") {
+      filtro.categoria = selectedCategory;
+    }
+
+    const minimo = Number(precoMinUrl.replace(",", "."));
+    const maximo = Number(precoMaxUrl.replace(",", "."));
+
+    if (precoMinUrl && Number.isFinite(minimo)) filtro.precoMin = minimo;
+    if (precoMaxUrl && Number.isFinite(maximo)) filtro.precoMax = maximo;
+    if (somenteDestaque) filtro.destaque = true;
+
+    obterPaginaProdutos(filtro)
+      .then((resultado) => {
+        if (cancelado) return;
+        setSearchResults(resultado.itens);
+        setTotalResultados(resultado.total);
+      })
+      .catch(() => !cancelado && toast.error("Não foi possível pesquisar."))
+      .finally(() => {
+        if (!cancelado) {
+          setSearching(false);
+          setLoadingProducts(false);
+        }
+      });
+
+    return () => {
+      cancelado = true;
+    };
+  }, [termoUrl, selectedCategory, ordem, pagina, precoMinUrl, precoMaxUrl, somenteDestaque, recarga]);
 
   // Categorias vêm do catálogo do backend, não de uma lista fixa.
   useEffect(() => {
@@ -494,72 +514,17 @@ function Home() {
     }
 
     obterPedidos()
-      .then((lista) => setOrders(lista.map(mapearPedido)))
+      .then((lista) =>
+        setOrders(lista.filter((pedido) => String(pedido.compradorId) === String(user.id))),
+      )
       .catch(() => setOrders([]));
   }, [user]);
 
-  async function finalizarPedido() {
-    if (cart.length === 0 || enviandoPedido) {
-      return;
-    }
-
-    setEnviandoPedido(true);
-
-    try {
-      for (const item of cart) {
-        await criarPedido({
-          produtoId: item.id,
-          cep: checkoutForm.cep,
-          logradouro: checkoutForm.logradouro,
-          numero: checkoutForm.numero,
-          complemento: checkoutForm.complemento,
-          bairro: checkoutForm.bairro,
-          cidade: checkoutForm.cidade,
-          estado: checkoutForm.estado,
-          formaPagamento: checkoutForm.formaPagamento,
-        });
-      }
-
-      const atualizados = await obterPedidos();
-
-      setOrders(atualizados.map(mapearPedido));
-      setCart([]);
-      setCheckoutForm(emptyCheckout);
-      setShowCheckout(false);
-      setShowCart(false);
-
-      toast.success("Pedido criado com sucesso! ✨");
-
-      setTimeout(() => {
-        scrollToOrders();
-      }, 100);
-    } catch (erro) {
-      toast.error(
-        erro instanceof Error
-          ? erro.message
-          : "Não foi possível concluir o pedido.",
-      );
-    } finally {
-      setEnviandoPedido(false);
-    }
-  }
-
-  const meusProdutos = products.filter(
-    (product) => String(product.usuarioId) === user?.id,
-  );
-
-  const favoriteProducts = products.filter((product) =>
-    favorites.includes(product.id),
-  );
-
-  const cartTotal = cart.reduce(
-    (total, item) => total + item.preco * item.quantidade,
-    0,
-  );
-
-  const cartQuantity = cart.reduce((total, item) => total + item.quantidade, 0);
-
-  const featuredProduct = products[0];
+  const totalPaginas = Math.max(1, Math.ceil(totalResultados / TAMANHO_PAGINA));
+  const ultimoPedido = orders[0];
+  const etapaUltimo = ultimoPedido ? etapaAtual(ultimoPedido.estado) : -1;
+  const filtrando =
+    termoUrl !== "" || selectedCategory !== "Todos" || precoMinUrl !== "" || precoMaxUrl !== "" || somenteDestaque;
 
   if (loadingUser) {
     return (
@@ -595,22 +560,42 @@ function Home() {
 
           <input
             type="text"
+            aria-label="Pesquisar produtos"
             placeholder="Buscar itens, personagens, coleções..."
             value={search}
             onChange={(event) => setSearch(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                atualizarParametros({ q: search.trim() || null });
+                scrollToProducts();
+              }
+            }}
           />
+
+          {search && (
+            <button
+              type="button"
+              className="link-texto"
+              aria-label="Limpar pesquisa"
+              onClick={limparSoOTermo}
+            >
+              ✕
+            </button>
+          )}
           </div>
 
           <div className="home-search-filtros">
             <select
               className="toolbar-select"
+              aria-label="Ordenar por"
               value={ordem}
               onChange={(event) => setOrdem(event.target.value)}
             >
-              <option value="Relevancia">Relevância</option>
-              <option value="MenorPreco">Menor preço</option>
-              <option value="MaiorPreco">Maior preço</option>
-              <option value="Novidades">Novidades</option>
+              {ORDENS.map((opcao) => (
+                <option key={opcao.valor} value={opcao.valor}>
+                  {opcao.rotulo}
+                </option>
+              ))}
             </select>
 
             <input
@@ -629,7 +614,7 @@ function Home() {
 
             <button
               className={somenteDestaque ? "active" : ""}
-              onClick={() => setSomenteDestaque((atual) => !atual)}
+              onClick={() => atualizarParametros({ destaque: somenteDestaque ? null : "1" })}
             >
               ★ Destaques
             </button>
@@ -667,7 +652,7 @@ function Home() {
             {favorites.length > 0 && <strong>{favorites.length}</strong>}
           </button>
 
-          <button className="nav-button" onClick={() => setShowCart(true)}>
+          <button className="nav-button" onClick={() => navigate("/carrinho")}>
             🛒 <span>Carrinho</span>
             {cartQuantity > 0 && <strong>{cartQuantity}</strong>}
           </button>
@@ -692,7 +677,7 @@ function Home() {
                 <button
                   onClick={() => {
                     setShowProfile(false);
-                    scrollToOrders();
+                    navigate("/pedidos");
                   }}
                 >
                   📦 Meus pedidos
@@ -710,7 +695,7 @@ function Home() {
                 <button
                   onClick={() => {
                     setShowProfile(false);
-                    setShowCart(true);
+                    navigate("/carrinho");
                   }}
                 >
                   🛒 Meu carrinho
@@ -744,7 +729,7 @@ function Home() {
                 Meu catálogo →
               </button>
 
-              <button className="secondary-button" onClick={scrollToOrders}>
+              <button className="secondary-button" onClick={() => navigate("/pedidos")}>
                 Ver meus pedidos
               </button>
             </div>
@@ -773,10 +758,7 @@ function Home() {
             <div>
               <small>A CAMINHO</small>
               <strong>
-                {
-                  orders.filter((order) => order.status === "Em transporte")
-                    .length
-                }
+                {orders.filter((order) => order.estado === "Enviado").length}
               </strong>
             </div>
           </div>
@@ -807,10 +789,10 @@ function Home() {
               <h2>Meus pedidos</h2>
             </div>
 
-            <button onClick={scrollToOrders}>Ver todos →</button>
+            <button onClick={() => navigate("/pedidos")}>Ver todos →</button>
           </div>
 
-          {orders.length === 0 ? (
+          {!ultimoPedido ? (
             <div className="order-empty">
               <span>📦</span>
               <h3>Você ainda não possui pedidos</h3>
@@ -824,13 +806,17 @@ function Home() {
             </div>
           ) : (
             <>
-              <div className="order-card">
+              <div
+                className="order-card"
+                style={{ cursor: "pointer" }}
+                onClick={() => navigate(`/pedidos/${ultimoPedido.id}`)}
+              >
                 <div className="order-product">
                   <div className="product-image">
-                    {featuredProduct ? (
+                    {ultimoPedido.itens[0]?.imagemUrl ? (
                       <img
-                        src={featuredProduct.imagemUrl}
-                        alt={featuredProduct.nome}
+                        src={urlImagem(ultimoPedido.itens[0].imagemUrl)}
+                        alt={ultimoPedido.nomeProduto}
                       />
                     ) : (
                       <span>📦</span>
@@ -838,60 +824,49 @@ function Home() {
                   </div>
 
                   <div>
-                    <span className="order-number">PEDIDO #{orders[0].id}</span>
+                    <span className="order-number">PEDIDO {ultimoPedido.codigo}</span>
 
-                    <h3>{featuredProduct?.nome || orders[0].produto}</h3>
+                    <h3>{ultimoPedido.nomeProduto}</h3>
 
-                    <p>{orders[0].quantidade} unidade</p>
+                    <p>
+                      {ultimoPedido.quantidadeTotal}{" "}
+                      {ultimoPedido.quantidadeTotal === 1 ? "unidade" : "unidades"}
+                    </p>
                   </div>
                 </div>
 
                 <div className="order-price">
                   <small>TOTAL</small>
 
-                  <strong>
-                    R$ {orders[0].total.toFixed(2).replace(".", ",")}
-                  </strong>
+                  <strong>{moeda(ultimoPedido.total)}</strong>
                 </div>
 
                 <div className="order-status">
                   <span className="status-dot"></span>
 
                   <div>
-                    <strong>{orders[0].status}</strong>
+                    <strong>{ROTULO_PEDIDO[ultimoPedido.estado] ?? ultimoPedido.estado}</strong>
 
-                    <small>Previsão: {orders[0].data}</small>
+                    <small>Feito em {data(ultimoPedido.criadoEm)}</small>
                   </div>
                 </div>
               </div>
 
-              <div className="order-progress">
-                <div className="progress-step active">
-                  <span>✓</span>
-                  <small>Pedido realizado</small>
+              {etapaUltimo >= 0 && (
+                <div className="order-progress">
+                  {NOMES_ETAPAS.slice(0, 4).map((nome, indice) => (
+                    <div key={nome} style={{ display: "contents" }}>
+                      {indice > 0 && (
+                        <div className={`progress-line ${indice <= etapaUltimo ? "active" : ""}`}></div>
+                      )}
+                      <div className={`progress-step ${indice <= etapaUltimo ? "active" : ""}`}>
+                        <span>{indice <= etapaUltimo ? "✓" : "○"}</span>
+                        <small>{nome}</small>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-
-                <div className="progress-line active"></div>
-
-                <div className="progress-step active">
-                  <span>✓</span>
-                  <small>Preparando</small>
-                </div>
-
-                <div className="progress-line active"></div>
-
-                <div className="progress-step active">
-                  <span>🚚</span>
-                  <small>Em transporte</small>
-                </div>
-
-                <div className="progress-line"></div>
-
-                <div className="progress-step">
-                  <span>○</span>
-                  <small>Entregue</small>
-                </div>
-              </div>
+              )}
             </>
           )}
         </section>
@@ -934,11 +909,25 @@ function Home() {
         <section className="recommended-section" id="products">
           <div className="section-heading">
             <div>
-              <span>hora de vender seus itens estagnados</span>
-              <h2>Cadastre seus itens no catálogo</h2>
+              <span>{termoUrl ? "RESULTADOS DA PESQUISA" : "CATÁLOGO"}</span>
+              <h2>
+                {termoUrl ? `Resultados para "${termoUrl}"` : "Itens à venda"}
+              </h2>
             </div>
 
+            {filtrando && (
+              <button onClick={limparPesquisa}>Limpar pesquisa e filtros ✕</button>
+            )}
           </div>
+
+          {!searching && (
+            <p style={{ color: "#9b8fb0", margin: "0 0 12px" }}>
+              {totalResultados} {totalResultados === 1 ? "produto encontrado" : "produtos encontrados"}
+              {" · ordenado por "}
+              {ORDENS.find((opcao) => opcao.valor === ordem)?.rotulo ?? "Relevância"}
+              {totalPaginas > 1 && ` · página ${pagina} de ${totalPaginas}`}
+            </p>
+          )}
 
           <div className="product-toolbar">
 
@@ -967,14 +956,24 @@ function Home() {
               <div className="products-empty">
                 <span>◇</span>
                 <h3>Nenhum produto encontrado</h3>
-                <p>Tente outra busca ou cadastre um novo produto.</p>
+                <p>
+                  {termoUrl
+                    ? `Nenhum anúncio corresponde a "${termoUrl}". Confira a ortografia ou use menos palavras.`
+                    : "Nenhum anúncio corresponde aos filtros escolhidos."}
+                </p>
 
-                <button
-                  className="primary-button"
-                  onClick={() => navigate("/anuncios/novo")}
-                >
-                  Cadastrar produto
-                </button>
+                {filtrando ? (
+                  <button className="primary-button" onClick={limparPesquisa}>
+                    Limpar pesquisa e voltar ao catálogo
+                  </button>
+                ) : (
+                  <button
+                    className="primary-button"
+                    onClick={() => navigate("/anuncios/novo")}
+                  >
+                    Cadastrar produto
+                  </button>
+                )}
               </div>
             ) : (
               searchResults.map((product) => (
@@ -983,7 +982,11 @@ function Home() {
                     className="product-cover"
                     onClick={() => setSelectedProduct(product)}
                   >
-                    <img src={product.imagemUrl} alt={product.nome} />
+                    {product.imagemUrl ? (
+                      <img src={urlImagem(product.imagemUrl)} alt={product.nome} />
+                    ) : (
+                      <span style={{ fontSize: 48, color: "#3a2c50", display: "grid", placeItems: "center", height: "100%" }}>◇</span>
+                    )}
 
                     <button
                       className={`favorite ${
@@ -991,7 +994,7 @@ function Home() {
                       }`}
                       onClick={(event) => {
                         event.stopPropagation();
-                        toggleFavorite(product.id);
+                        void toggleFavorite(product);
                       }}
                     >
                       {favorites.includes(product.id) ? "♥" : "♡"}
@@ -1003,145 +1006,76 @@ function Home() {
 
                     <h3>{product.nome}</h3>
 
-                    <strong>
-                      R$ {product.preco.toFixed(2).replace(".", ",")}
-                    </strong>
+                    <strong>{moeda(product.preco)}</strong>
+
+                    <small style={{ color: "#9b8fb0", display: "block", marginTop: 4 }}>
+                      {product.vendedorNome ? `por ${product.vendedorNome} · ` : ""}
+                      {(product.totalAvaliacoes ?? 0) > 0
+                        ? `${estrelas(product.mediaAvaliacoes ?? 0)} (${product.totalAvaliacoes})`
+                        : "Sem avaliações"}
+                      {(product.vendas ?? 0) > 0 && ` · ${product.vendas} vendido(s)`}
+                    </small>
+
+                    <small style={{ color: product.estoque <= 2 ? "#f1d58a" : "#9b8fb0", display: "block" }}>
+                      {product.estoque === 1 ? "Última unidade!" : `${product.estoque} em estoque`}
+                    </small>
 
                     <div className="product-card-actions">
-                      <button onClick={() => setSelectedProduct(product)}>
+                      <button onClick={() => navigate(`/produto/${product.id}`)}>
                         Ver detalhes
                       </button>
 
-                      <button onClick={() => addToCart(product)}>
-                        Adicionar
+                      <button
+                        onClick={() => addToCart(product)}
+                        disabled={ehMeu(product)}
+                        title={ehMeu(product) ? "Este anúncio é seu" : undefined}
+                      >
+                        {ehMeu(product) ? "Seu anúncio" : "Adicionar"}
                       </button>
                     </div>
 
-                    <div className="product-management">
-                      <button onClick={() => openEditProduct(product)}>
-                        Editar
-                      </button>
+                    {ehMeu(product) && (
+                      <div className="product-management">
+                        <button onClick={() => openEditProduct(product)}>
+                          Editar
+                        </button>
 
-                      <button onClick={() => handleDeleteProduct(product.id)}>
-                        Excluir
-                      </button>
-                    </div>
+                        <button onClick={() => handleDeleteProduct(product.id)}>
+                          Excluir
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </article>
               ))
             )}
           </div>
+
+          {!searching && totalPaginas > 1 && (
+            <nav className="paginacao" aria-label="Páginas de resultados">
+              <button disabled={pagina <= 1} onClick={() => irParaPagina(pagina - 1)}>
+                ‹
+              </button>
+
+              {Array.from({ length: totalPaginas }, (_, indice) => indice + 1)
+                .filter((numero) => Math.abs(numero - pagina) <= 2 || numero === 1 || numero === totalPaginas)
+                .map((numero) => (
+                  <button
+                    key={numero}
+                    className={numero === pagina ? "ativa" : ""}
+                    onClick={() => irParaPagina(numero)}
+                  >
+                    {numero}
+                  </button>
+                ))}
+
+              <button disabled={pagina >= totalPaginas} onClick={() => irParaPagina(pagina + 1)}>
+                ›
+              </button>
+            </nav>
+          )}
         </section>
       </div>
-
-      {showCart && (
-        <div className="modal-overlay" onClick={() => setShowCart(false)}>
-          <aside
-            className="side-panel"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="panel-header">
-              <div>
-                <span>MINHA COMPRA</span>
-                <h2>Carrinho</h2>
-              </div>
-
-              <button onClick={() => setShowCart(false)}>×</button>
-            </div>
-
-            {cart.length === 0 ? (
-              <div className="panel-empty">
-                <span>🛒</span>
-                <h3>Seu carrinho está vazio</h3>
-                <p>Adicione produtos para começar sua compra.</p>
-
-                <button
-                  className="primary-button"
-                  onClick={() => {
-                    setShowCart(false);
-                    scrollToProducts();
-                  }}
-                >
-                  Explorar produtos
-                </button>
-              </div>
-            ) : (
-              <>
-                <div className="cart-items">
-                  {cart.map((item) => (
-                    <div className="cart-item" key={item.id}>
-                      <img src={item.imagemUrl} alt={item.nome} />
-
-                      <div>
-                        <strong>{item.nome}</strong>
-
-                        <span>
-                          R$ {item.preco.toFixed(2).replace(".", ",")}
-                        </span>
-
-                        <div className="quantity-control">
-                          <button
-                            onClick={() =>
-                              changeCartQuantity(item.id, item.quantidade - 1)
-                            }
-                          >
-                            −
-                          </button>
-
-                          <span>{item.quantidade}</span>
-
-                          <button
-                            onClick={() =>
-                              changeCartQuantity(item.id, item.quantidade + 1)
-                            }
-                          >
-                            +
-                          </button>
-                        </div>
-                      </div>
-
-                      <button
-                        className="remove-item"
-                        onClick={() => removeFromCart(item.id)}
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="cart-footer">
-                  <div>
-                    <span>Total</span>
-
-                    <strong>R$ {cartTotal.toFixed(2).replace(".", ",")}</strong>
-                  </div>
-
-                  <button
-                    className="primary-button"
-                    onClick={() => {
-                      if (cart.length === 0) {
-                        return;
-                      }
-
-                      setShowCart(false);
-                      setShowCheckout(true);
-
-                      toast.success("Pedido criado com sucesso! ✨");
-
-                      setTimeout(() => {
-                        scrollToOrders();
-                      }, 100);
-                    }}
-                  >
-                    Finalizar pedido →
-                  </button>
-                </div>
-              </>
-            )}
-          </aside>
-        </div>
-      )}
 
       {showSeller && (
         <div className="modal-overlay" onClick={() => setShowSeller(false)}>
@@ -1205,161 +1139,6 @@ function Home() {
         </div>
       )}
 
-      {showCheckout && (
-        <div className="modal-overlay" onClick={() => setShowCheckout(false)}>
-          <aside
-            className="side-panel"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="panel-header">
-              <div>
-                <span>CHECKOUT</span>
-                <h2>Entrega e pagamento</h2>
-              </div>
-
-              <button onClick={() => setShowCheckout(false)}>×</button>
-            </div>
-
-            <form
-              className="checkout-form"
-              onSubmit={(event) => {
-                event.preventDefault();
-                void finalizarPedido();
-              }}
-            >
-              <div className="checkout-grid">
-                <label>
-                  CEP
-                  <input
-                    value={checkoutForm.cep}
-                    placeholder="00000-000"
-                    onChange={(event) =>
-                      setCheckoutForm({ ...checkoutForm, cep: event.target.value })
-                    }
-                    required
-                  />
-                </label>
-
-                <label>
-                  Número
-                  <input
-                    value={checkoutForm.numero}
-                    onChange={(event) =>
-                      setCheckoutForm({
-                        ...checkoutForm,
-                        numero: event.target.value,
-                      })
-                    }
-                    required
-                  />
-                </label>
-
-                <label className="wide">
-                  Logradouro
-                  <input
-                    value={checkoutForm.logradouro}
-                    onChange={(event) =>
-                      setCheckoutForm({
-                        ...checkoutForm,
-                        logradouro: event.target.value,
-                      })
-                    }
-                    required
-                  />
-                </label>
-
-                <label className="wide">
-                  Complemento
-                  <input
-                    value={checkoutForm.complemento}
-                    onChange={(event) =>
-                      setCheckoutForm({
-                        ...checkoutForm,
-                        complemento: event.target.value,
-                      })
-                    }
-                  />
-                </label>
-
-                <label>
-                  Bairro
-                  <input
-                    value={checkoutForm.bairro}
-                    onChange={(event) =>
-                      setCheckoutForm({
-                        ...checkoutForm,
-                        bairro: event.target.value,
-                      })
-                    }
-                    required
-                  />
-                </label>
-
-                <label>
-                  Cidade
-                  <input
-                    value={checkoutForm.cidade}
-                    onChange={(event) =>
-                      setCheckoutForm({
-                        ...checkoutForm,
-                        cidade: event.target.value,
-                      })
-                    }
-                    required
-                  />
-                </label>
-
-                <label>
-                  Estado (UF)
-                  <input
-                    value={checkoutForm.estado}
-                    maxLength={2}
-                    onChange={(event) =>
-                      setCheckoutForm({
-                        ...checkoutForm,
-                        estado: event.target.value,
-                      })
-                    }
-                    required
-                  />
-                </label>
-
-                <label>
-                  Forma de pagamento
-                  <select
-                    value={checkoutForm.formaPagamento}
-                    onChange={(event) =>
-                      setCheckoutForm({
-                        ...checkoutForm,
-                        formaPagamento: event.target.value,
-                      })
-                    }
-                  >
-                    <option value="Pix">Pix</option>
-                    <option value="CartaoCredito">Cartão de crédito</option>
-                    <option value="Boleto">Boleto</option>
-                  </select>
-                </label>
-              </div>
-
-              <div className="checkout-total">
-                <span>Total</span>
-
-                <strong>R$ {cartTotal.toFixed(2).replace(".", ",")}</strong>
-              </div>
-
-              <button
-                className="primary-button"
-                type="submit"
-                disabled={enviandoPedido}
-              >
-                {enviandoPedido ? "Processando..." : "Confirmar pedido"}
-              </button>
-            </form>
-          </aside>
-        </div>
-      )}
-
       {showFavorites && (
         <div className="modal-overlay" onClick={() => setShowFavorites(false)}>
           <aside
@@ -1395,7 +1174,11 @@ function Home() {
               <div className="favorite-list">
                 {favoriteProducts.map((product) => (
                   <div className="favorite-item" key={product.id}>
-                    <img src={product.imagemUrl} alt={product.nome} />
+                    {product.imagemUrl ? (
+                      <img src={urlImagem(product.imagemUrl)} alt={product.nome} />
+                    ) : (
+                      <span style={{ fontSize: 48, color: "#3a2c50", display: "grid", placeItems: "center", height: "100%" }}>◇</span>
+                    )}
 
                     <div>
                       <span>{product.categoria}</span>
@@ -1405,12 +1188,12 @@ function Home() {
                         R$ {product.preco.toFixed(2).replace(".", ",")}
                       </small>
 
-                      <button onClick={() => addToCart(product)}>
-                        Adicionar ao carrinho
+                      <button onClick={() => addToCart(product)} disabled={ehMeu(product) || !product.disponivel}>
+                        {ehMeu(product) ? "Seu anúncio" : product.disponivel ? "Adicionar ao carrinho" : "Indisponível"}
                       </button>
                     </div>
 
-                    <button onClick={() => toggleFavorite(product.id)}>
+                    <button onClick={() => void toggleFavorite(product)}>
                       ♥
                     </button>
                   </div>
@@ -1435,7 +1218,11 @@ function Home() {
             </button>
 
             <div className="product-modal-image">
-              <img src={selectedProduct.imagemUrl} alt={selectedProduct.nome} />
+              {selectedProduct.imagemUrl ? (
+                <img src={urlImagem(selectedProduct.imagemUrl)} alt={selectedProduct.nome} />
+              ) : (
+                <span style={{ fontSize: 64, color: "#3a2c50", display: "grid", placeItems: "center", height: "100%" }}>◇</span>
+              )}
             </div>
 
             <div className="product-modal-content">
@@ -1483,18 +1270,17 @@ function Home() {
               </div>
 
               <div className="product-modal-footer">
-                <strong>
-                  R$ {selectedProduct.preco.toFixed(2).replace(".", ",")}
-                </strong>
+                <strong>{moeda(selectedProduct.preco)}</strong>
 
                 <button
                   className="primary-button"
+                  disabled={ehMeu(selectedProduct)}
                   onClick={() => {
                     addToCart(selectedProduct);
                     setSelectedProduct(null);
                   }}
                 >
-                  Adicionar ao carrinho →
+                  {ehMeu(selectedProduct) ? "Este anúncio é seu" : "Adicionar ao carrinho →"}
                 </button>
               </div>
             </div>
