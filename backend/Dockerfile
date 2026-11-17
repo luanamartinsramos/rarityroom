@@ -14,4 +14,11 @@ WORKDIR /app
 
 COPY --from=build /app/publish .
 
-ENTRYPOINT ["dotnet", "RarityRoom.dll"]
+# Pasta das imagens enviadas pelos vendedores.
+RUN mkdir -p /app/wwwroot/uploads
+
+# Plataformas como o Render informam a porta na variável PORT.
+ENV PORT=8080
+EXPOSE 8080
+
+ENTRYPOINT ["sh", "-c", "ASPNETCORE_URLS=http://0.0.0.0:${PORT} exec dotnet RarityRoom.dll"]
