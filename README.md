@@ -10,13 +10,35 @@ O projeto possui um **frontend desenvolvido em React + TypeScript** e um
 repositório (monorepo).
 
 
-# 👥 Alunos
+## Integrantes
 
-- Luana Martins Ramos - 06014936
-- Jeorgia Luiza da Rosa Canto - 06014796
-- Pedro Henrique Canto da Silva - 06013162
-- Lucas Ribeiro Dias - 06015364
-- Miguel Souza dos Santos - 06014237
+| Nome completo | Matrícula |
+|---|---|
+| Luana Martins Ramos | 06014936 |
+| Jeorgia Luiza da Rosa Canto | 06014796 |
+| Pedro Henrique Canto da Silva | 06013162 |
+| Lucas Ribeiro Dias | 06015364 |
+| Miguel Souza dos Santos | 06014237 |
+
+**Disciplina:** Design e Programação Orientados a Objetos — Prof. André Campos (AV2).
+
+## Documentação técnica da AV2
+
+Tudo em [`docs/av2/`](docs/av2/), com índice em
+[`docs/av2/evidencias.json`](docs/av2/evidencias.json):
+
+| Documento | Conteúdo |
+|---|---|
+| [`especificacao.md`](docs/av2/especificacao.md) | 3 fluxos, 5 regras de negócio, estados e critérios de aceitação |
+| [`requisitos.md`](docs/av2/requisitos.md) | requisitos funcionais e regras complementares |
+| [`modelo-de-classes.md`](docs/av2/modelo-de-classes.md) | modelo de classes (Mermaid) conferido com o código |
+| [`decisoes-de-modelagem.md`](docs/av2/decisoes-de-modelagem.md) | decisões com comparação de alternativas |
+| [`code-review.md`](docs/av2/code-review.md) | revisão de uma alteração funcional do histórico Git |
+| [`excecoes.md`](docs/av2/excecoes.md) | situações de falha, propagação e tratamento |
+| [`debugging.md`](docs/av2/debugging.md) | defeito reproduzido, hipóteses, técnica, causa e correção |
+| [`testes.md`](docs/av2/testes.md) | suíte automatizada e rastreabilidade |
+| [`especificacao-dscode.md`](docs/av2/especificacao-dscode.md) | especificação para agente + verificação do resultado |
+| [`auditoria-final.md`](docs/av2/auditoria-final.md) | os 40 itens da rubrica, evidências e pendências |
 
 ---
 
@@ -76,105 +98,54 @@ com uma interface moderna, escura e focada na apresentação dos produtos.
 
 # 💻 Como baixar e executar
 
-O Frontend e o Backend estão dentro do mesmo repositório.
+Pré-requisitos: **Git**, **.NET SDK 10** e **Node.js 20+**.
 
-Para executar o projeto localmente, é necessário ter instalado:
+## 1. Clonar
 
-- Git
-- Node.js
-- .NET SDK 10
-
-## 1. Clonar o repositório
-
-No terminal:
-
-
+```bash
 git clone https://github.com/luanamartinsramos/rarityroom.git
-
-Depois, entre na pasta do projeto:
-
 cd rarityroom
-🎨 Frontend
+```
 
-O Frontend foi desenvolvido utilizando:
+## 2. Backend (API ASP.NET Core — http://localhost:5000)
 
-React
-TypeScript
-Vite
-CSS
-React Router
-React Hot Toast
-
-Ele é responsável pela interface da aplicação e pela interação do usuário
-com a plataforma.
-
-# 2. Entrar na pasta do Frontend
-cd frontend
-3. Instalar as dependências
-npm install
-
-Esse comando instala todas as dependências necessárias para executar o
-Frontend.
-
-# 4. Executar o Frontend
-npm run dev
-
-O Frontend ficará disponível normalmente em:
-
-http://localhost:5173
-
-
-# ⚙️ Backend
-
-O Backend foi desenvolvido utilizando:
-
-C#
-ASP.NET Core
-.NET 10
-REST API
-JSON
-Swagger
-Autenticação por Cookies
-CORS
-
-Ele é responsável pela autenticação dos usuários e pelas operações
-relacionadas aos produtos.
-
-# 5. Abrir o Backend
-
-Abra outro terminal e volte para a pasta principal do projeto:
-
-cd ..
-
-Depois:
-
+```bash
 cd backend
-# 6. Restaurar as dependências
 dotnet restore
-
-Esse comando restaura as dependências necessárias do projeto .NET.
-
-# 7. Compilar o Backend
 dotnet build
-
-Esse comando verifica se o Backend está compilando corretamente.
-
-# 8. Executar o Backend
 dotnet run
+```
 
-O Backend ficará disponível em:
+**Banco de dados:** não é preciso preparar nada à mão. Na primeira execução o
+backend cria o arquivo SQLite `backend/rarityroom.db` e aplica todas as
+migrações de `backend/Dados/Migracoes` (`Database.Migrate()`), além de cadastrar
+as categorias e a conta de administrador `admin@rarityroom.com` / `admin123`.
+Para começar do zero, pare o backend e apague `rarityroom.db`.
 
-http://localhost:5000
+## 3. Frontend (React + Vite — http://localhost:5173)
 
-# 🔗 Comunicação entre Frontend e Backend
+Em outro terminal, a partir da raiz do repositório:
 
-O Frontend e o Backend funcionam separadamente, mas se comunicam através de
-uma API REST.
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
+Frontend e backend precisam estar rodando ao mesmo tempo. Em desenvolvimento o
+frontend chama a API em `http://localhost:5000`.
 
+## 4. Testes automatizados
 
-Para utilizar a aplicação completa localmente, o Frontend e o Backend
-devem estar executando ao mesmo tempo.
+A partir da raiz do repositório:
+
+```bash
+cd tests/RarityRoom.Tests
+dotnet test
+```
+
+Os testes de integração sobem a API em memória com um banco SQLite
+temporário — não usam nem alteram o `rarityroom.db` de desenvolvimento.
 
 # 📖 Swagger
 
