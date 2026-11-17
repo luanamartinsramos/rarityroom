@@ -227,7 +227,11 @@ cd tests/RarityRoom.Tests
 dotnet test
 ```
 
-Resultado esperado: **135 testes aprovados, 0 falhas** (9 deles de integração HTTP).
+Resultado esperado: **222 testes aprovados, 0 falhas**. A suíte
+`Api/MarketplaceApiTests.cs` cobre, pela API HTTP real, pesquisa, as 7
+ordenações, carrinho e limites de estoque, checkout, PIX/boleto/cartão
+simulados, cancelamento, expiração, compras simultâneas do mesmo estoque,
+pedidos duplicados e as regras de segurança.
 
 Os testes ficam fora de `backend/` porque o SDK Web compila todo `*.cs` da
 pasta do projeto — uma pasta de testes dentro do backend entraria no build da
@@ -241,7 +245,8 @@ aplicação.
 | POST | `/api/autenticacao/entrar` | pública |
 | POST | `/api/autenticacao/sair` | cookie |
 | GET | `/api/autenticacao/usuário-atual` | cookie |
-| GET | `/api/produtos?termo=| GET | `/api/produtos` | pública |categoria=| GET | `/api/produtos` | pública |estado=` | pública (busca) |
+| GET | `/api/produtos?termo=&categoria=&ordem=&pagina=&tamanhoPagina=` | pública (busca; total em `X-Total-Count`) |
+| GET | `/api/produtos/meus` | cookie (anúncios do usuário, qualquer estado) |
 | GET | `/api/produtos/{id}` | pública |
 | POST | `/api/produtos` | cookie |
 | PUT | `/api/produtos/{id}` | cookie (só o dono) |
@@ -252,7 +257,12 @@ aplicação.
 | GET | `/api/favoritos` | cookie |
 | POST/DELETE | `/api/favoritos/{produtoId}` | cookie |
 | GET/POST | `/api/propostas` | cookie |
-| GET/POST | `/api/pedidos` | cookie |
+| GET/POST/PUT/DELETE | `/api/carrinho`, `/api/carrinho/itens/{produtoId}` | cookie |
+| GET | `/api/pedidos`, `/api/pedidos/{id}` | cookie (só participantes) |
+| POST | `/api/pedidos` (checkout a partir do carrinho) | cookie |
+| GET | `/api/pagamentos/{id}` | cookie (só o comprador) |
+| POST | `/api/pagamentos/{id}/simular-confirmacao` \| `/cartao` \| `/simular-expiracao` \| `/cancelar` | cookie (só o comprador) |
+| POST | `/api/pedidos/{id}/enviar` \| `/entregar` | cookie (vendedor \| comprador) |
 | POST | `/api/pedidos/{id}/concluir` | cookie (vendedor) |
 | POST | `/api/pedidos/{id}/cancelar` | cookie |
 | POST | `/api/avaliacoes` | cookie (comprador) |
@@ -263,6 +273,32 @@ aplicação.
 Estados de erro seguem o padrão `ProblemDetails` com um campo `codigo`:
 `dados-invalidos`, `acesso-negado`, `nao-encontrado`, `conflito`,
 `transicao-invalida`.
+
+# 🛒 Fluxo de compra e pagamento simulado
+
+1. O comprador adiciona produtos ao carrinho (catálogo ou página do produto).
+   O carrinho fica no banco, vinculado à conta, e **não** reserva estoque.
+2. No checkout o servidor valida itens, preços e estoque, cria a compra
+   "aguardando pagamento" e **um pedido por vendedor**. O carrinho continua
+   intacto.
+3. Na página de pagamento o comprador conclui a simulação. Só na aprovação o
+   estoque é baixado (em transação, com controle de concorrência) e os itens
+   saem do carrinho.
+
+> ⚠️ **Nenhum pagamento é real.** Não há gateway, banco ou API financeira.
+> O QR Code/“copia e cola” do PIX e a linha digitável do boleto são
+> fictícios (banco 999) e não têm validade. Do cartão, só os 4 últimos
+> dígitos, a bandeira e as parcelas são gravados.
+
+| Forma | Como simular |
+|---|---|
+| PIX | Botão **Simular pagamento confirmado** (ou **Simular expiração**). Prazo: 30 min. |
+| Boleto | Botão **Simular pagamento confirmado** (ou **Simular vencimento**). Vencimento: 3 dias. Pode ser impresso. |
+| Cartão | `4111 1111 1111 1111` → aprovado · `4000 0000 0000 0002` → recusado · `4000 0000 0000 9995` → recusado por limite. Qualquer outro número válido (Luhn) é aprovado. Validade futura, CVV com 3 dígitos (4 no Amex). |
+
+Estados do pagamento: aguardando pagamento, aprovado, recusado, expirado,
+compra cancelada e estornado (pedido pago cancelado antes do envio; as
+unidades voltam ao estoque).
 
 # 📚 Documentação AV2
 
