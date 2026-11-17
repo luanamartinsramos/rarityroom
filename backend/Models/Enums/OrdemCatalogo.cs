@@ -9,5 +9,14 @@ public enum OrdemCatalogo
 
     MaiorPreco = 3,
 
-    Novidades = 4
+    /// <summary>Anúncios publicados recentemente primeiro (antigo "Novidades").</summary>
+    MaisRecentes = 4,
+
+    MaisAntigos = 5,
+
+    /// <summary>Quantidade de unidades vendidas em pedidos com pagamento aprovado.</summary>
+    MaisVendidos = 6,
+
+    /// <summary>Média das avaliações reais; anúncios sem avaliação vão ao fim.</summary>
+    MelhorAvaliados = 7
 }

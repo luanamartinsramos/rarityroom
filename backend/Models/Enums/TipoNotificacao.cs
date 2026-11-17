@@ -19,5 +19,7 @@ public enum TipoNotificacao
 
     PedidoPago = 7,
 
-    PedidoEnviado = 8
+    PedidoEnviado = 8,
+
+    PedidoCancelado = 9
 }
