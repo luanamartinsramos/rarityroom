@@ -72,11 +72,10 @@ public class FluxoApiTests
         return corpo.GetProperty("id").GetInt32();
     }
 
-    private static object Checkout(int produtoId)
+    internal static object Checkout(string formaPagamento = "Pix", string? chave = null)
     {
         return new
         {
-            produtoId,
             cep = "01310-100",
             logradouro = "Avenida Paulista",
             numero = "1000",
@@ -84,8 +83,49 @@ public class FluxoApiTests
             bairro = "Bela Vista",
             cidade = "São Paulo",
             estado = "SP",
-            formaPagamento = "Pix"
+            formaPagamento,
+            chaveIdempotencia = chave ?? Guid.NewGuid().ToString("N")
         };
+    }
+
+    /// <summary>
+    /// Fluxo real de compra: adiciona ao carrinho e finaliza. Se o carrinho
+    /// recusar o item, devolve essa resposta.
+    /// </summary>
+    internal static async Task<HttpResponseMessage> FazerCheckout(
+        HttpClient cliente,
+        int produtoId,
+        int quantidade = 1,
+        string formaPagamento = "Pix")
+    {
+        var item = await cliente.PostAsJsonAsync(
+            "/api/carrinho/itens",
+            new { produtoId, quantidade });
+
+        if (!item.IsSuccessStatusCode)
+        {
+            return item;
+        }
+
+        return await cliente.PostAsJsonAsync("/api/pedidos", Checkout(formaPagamento));
+    }
+
+    /// <summary>Compra e paga (PIX simulado). Devolve o id do pedido.</summary>
+    internal static async Task<int> ComprarEPagar(HttpClient cliente, int produtoId)
+    {
+        var resposta = await FazerCheckout(cliente, produtoId);
+        Assert.Equal(HttpStatusCode.Created, resposta.StatusCode);
+
+        var compra = await resposta.Content.ReadFromJsonAsync<JsonElement>();
+        int pagamentoId = compra.GetProperty("id").GetInt32();
+
+        var pago = await cliente.PostAsync(
+            $"/api/pagamentos/{pagamentoId}/simular-confirmacao",
+            content: null);
+
+        Assert.Equal(HttpStatusCode.OK, pago.StatusCode);
+
+        return compra.GetProperty("pedidos")[0].GetProperty("id").GetInt32();
     }
 
     private static string EmailUnico(string prefixo)
@@ -164,18 +204,24 @@ public class FluxoApiTests
 
         int produtoId = await CriarAnuncio(vendedor);
 
-        var respostaPedido = await comprador.PostAsJsonAsync(
-            "/api/pedidos",
-            Checkout(produtoId));
+        var respostaPedido = await FazerCheckout(comprador, produtoId);
 
         Assert.Equal(HttpStatusCode.Created, respostaPedido.StatusCode);
 
-        var pedido = await respostaPedido.Content.ReadFromJsonAsync<JsonElement>();
+        var compra = await respostaPedido.Content.ReadFromJsonAsync<JsonElement>();
+        var pedido = compra.GetProperty("pedidos")[0];
         int pedidoId = pedido.GetProperty("id").GetInt32();
 
         // Snapshot: o pedido guarda o preço do momento da compra.
-        Assert.Equal(249.90m, pedido.GetProperty("precoUnitario").GetDecimal());
-        Assert.Equal("Funko Batman", pedido.GetProperty("nomeProduto").GetString());
+        var item = pedido.GetProperty("itens")[0];
+        Assert.Equal(249.90m, item.GetProperty("precoUnitario").GetDecimal());
+        Assert.Equal("Funko Batman", item.GetProperty("nomeProduto").GetString());
+
+        var pagamento = await comprador.PostAsync(
+            $"/api/pagamentos/{compra.GetProperty("id").GetInt32()}/simular-confirmacao",
+            content: null);
+
+        Assert.Equal(HttpStatusCode.OK, pagamento.StatusCode);
 
         var conclusao = await vendedor.PostAsync(
             $"/api/pedidos/{pedidoId}/concluir",
@@ -211,9 +257,7 @@ public class FluxoApiTests
 
         int produtoId = await CriarAnuncio(vendedor);
 
-        var resposta = await vendedor.PostAsJsonAsync(
-            "/api/pedidos",
-            Checkout(produtoId));
+        var resposta = await FazerCheckout(vendedor, produtoId);
 
         Assert.Equal(HttpStatusCode.BadRequest, resposta.StatusCode);
     }
@@ -230,10 +274,10 @@ public class FluxoApiTests
 
         int produtoId = await CriarAnuncio(vendedor);
 
-        var primeiro = await comprador.PostAsJsonAsync("/api/pedidos", Checkout(produtoId));
+        var primeiro = await FazerCheckout(comprador, produtoId);
         Assert.Equal(HttpStatusCode.Created, primeiro.StatusCode);
 
-        var segundo = await comprador.PostAsJsonAsync("/api/pedidos", Checkout(produtoId));
+        var segundo = await FazerCheckout(comprador, produtoId);
         Assert.Equal(HttpStatusCode.Conflict, segundo.StatusCode);
     }
 
@@ -249,12 +293,10 @@ public class FluxoApiTests
 
         int produtoId = await CriarAnuncio(vendedor);
 
-        var respostaPedido = await comprador.PostAsJsonAsync(
-            "/api/pedidos",
-            Checkout(produtoId));
+        var respostaPedido = await FazerCheckout(comprador, produtoId);
 
-        var pedido = await respostaPedido.Content.ReadFromJsonAsync<JsonElement>();
-        int pedidoId = pedido.GetProperty("id").GetInt32();
+        var compra = await respostaPedido.Content.ReadFromJsonAsync<JsonElement>();
+        int pedidoId = compra.GetProperty("pedidos")[0].GetProperty("id").GetInt32();
 
         var resposta = await comprador.PostAsJsonAsync(
             "/api/avaliacoes",
@@ -372,12 +414,7 @@ public class FluxoApiTests
 
         Assert.Equal(0, vazio.GetProperty("total").GetInt32());
 
-        var pedido = await comprador.PostAsJsonAsync(
-            "/api/pedidos",
-            Checkout(produtoId));
-
-        var corpo = await pedido.Content.ReadFromJsonAsync<JsonElement>();
-        int pedidoId = corpo.GetProperty("id").GetInt32();
+        int pedidoId = await ComprarEPagar(comprador, produtoId);
 
         await vendedor.PostAsync(
             "/api/pedidos/" + pedidoId + "/concluir",
@@ -443,9 +480,7 @@ public class FluxoApiTests
 
         int produtoId = await CriarAnuncio(vendedor);
 
-        var compra = await comprador.PostAsJsonAsync(
-            "/api/pedidos",
-            Checkout(produtoId));
+        var compra = await FazerCheckout(comprador, produtoId);
 
         Assert.Equal(HttpStatusCode.Created, compra.StatusCode);
 
@@ -479,12 +514,14 @@ public class FluxoApiTests
 
         int produtoId = await CriarAnuncio(vendedor);
 
-        var resposta = await comprador.PostAsJsonAsync("/api/pedidos", Checkout(produtoId));
+        var resposta = await FazerCheckout(comprador, produtoId);
 
         Assert.Equal(HttpStatusCode.Created, resposta.StatusCode);
 
-        var pedido = await resposta.Content.ReadFromJsonAsync<JsonElement>();
+        var compra = await resposta.Content.ReadFromJsonAsync<JsonElement>();
+        var pedido = compra.GetProperty("pedidos")[0];
 
+        Assert.Equal("Pix", compra.GetProperty("forma").GetString());
         Assert.Equal("Pix", pedido.GetProperty("formaPagamento").GetString());
         Assert.Equal("01310-100", pedido.GetProperty("entrega").GetProperty("cep").GetString());
         Assert.Equal("São Paulo", pedido.GetProperty("entrega").GetProperty("cidade").GetString());
