@@ -1,88 +1,98 @@
-# Code review
+# Revisão de código — alteração `1b32db1` (checkout e pagamento simulado)
 
-Revisão do código do backend, com foco em correção, coesão, duplicação e
-clareza. Cada achado aponta o problema, a correção aplicada e a evidência.
+## 1. Alteração selecionada (C01)
 
-## 1. Método
+| | |
+|---|---|
+| Commit | `1b32db1` — *feat(pedidos): checkout a partir do carrinho e pagamento simulado com revalidação de estoque* |
+| Branch / PR | `marketplace-completo`, PR #1 (incorporado à `main` com *merge commit*, preservando o hash) |
+| Como ver o diff | `git show 1b32db1` ou `git diff 1b32db1^ 1b32db1` |
+| Ponto de comparação | `1b32db1^` = `ba564d2` (*feat(pagamento): validação do cartão simulado (Luhn, validade, CVV, CPF, parcelas)*) — versão em que o pedido era de um único anúncio e o cliente informava se o pagamento era aprovado |
 
-1. Leitura das 18 classes originais do backend.
-2. Execução do fluxo real por HTTP para observar comportamento, não só código.
-3. Correção na camada dona do problema.
-4. Prova por teste automatizado + chamada HTTP.
+```
+backend/Controller/PagamentosController.cs |  60 ++++
+backend/Controller/PedidosController.cs    |  28 +-
+backend/Services/IServicoPedidos.cs        |  16 +-
+backend/Services/ServicoPedidos.cs         | 506 ++++++++++++++++++++++++-----
+4 files changed, 512 insertions(+), 98 deletions(-)
+```
 
-## 2. Achados e correções
+## 2. Requisito que a alteração implementa (C02)
 
-### C-01 — Regra de negócio ausente na entidade
-**Antes.** `Produto.Atualizar(...)` copiava os 9 campos sem validar nada.
-**Depois.** Validação compartilhada entre construtor e `Atualizar` em
-`AplicarDados`, com mensagem específica por campo.
-**Evidência.** `ProdutoValidacaoTests` (10 casos).
+Regras **RN4** e **RN5** de `especificacao.md` e o requisito de segurança
+"não permitir manipular valores ou a aprovação pelo frontend":
 
-### C-02 — Entidade sem identidade de dono
-**Antes.** `Produto` não conhecia o autor; a autorização era só `[Authorize]`.
-**Depois.** `UsuarioId` obrigatório + `ValidarPropriedade`/`ValidarExclusao`.
-**Evidência.** `ProdutoPropriedadeTests`; HTTP 403 para terceiro.
+| Requisito | Antes (`1b32db1^`) | Depois (`1b32db1`) | Prova no diff |
+|---|---|---|---|
+| Estoque só baixa com pagamento aprovado (RN5) | `Concluir` chamava `produto.Vender()`: o anúncio inteiro virava `Vendido` na conclusão, sem decrementar estoque | `Aprovar` chama `produto.BaixarEstoque(item.Quantidade)` para cada item | `-        produto.Vender();` / `+            produto.BaixarEstoque(item.Quantidade);` |
+| Revalidar estoque na finalização (RN4) | nenhuma validação de quantidade | `Finalizar` e `Aprovar` chamam `regras.Problema(...)` para cada item | métodos `Finalizar` e `Aprovar` |
+| Aprovação decidida pelo servidor | `[HttpPost("{id:int}/pagar")] Pagar(int id, ModeloPagamento modelo)` com `modelo.Aprovado` vindo do cliente | rota removida; aprovação só por `PagamentosController` (PIX/boleto simulados, cartão validado) | `-    [HttpPost("{id:int}/pagar")]` |
+| Um pedido por anúncio bloqueava outros compradores | `ObterPendentePorProduto(produtoId) != null` → 409 | removido; concorrência tratada na aprovação | `-        if (repositorioPedido.ObterPendentePorProduto(produtoId) != null)` |
 
-### C-03 — Identificador derivado da contagem
-**Antes.** `ObterTodos().Count + 1`.
-**Depois.** Contador próprio no repositório, sob `lock`.
-**Evidência.** `RepositorioProdutoTests`; HTTP id 4 após excluir id 2.
+Conclusão: o código implementa o comportamento pedido — verificado pelos
+testes da seção 4.
 
-### C-04 — Vazamento da coleção interna
-**Antes.** `ObterTodos()` devolvia a `List<T>` real; qualquer camada alterava
-o "banco" sem passar pelo repositório.
-**Depois.** Devolve cópia; toda mutação passa por método do repositório.
-**Evidência.** `ObterTodos_DeveDevolverCopiaDaLista`.
+## 3. Inventário dos arquivos modificados (C03)
 
-### C-05 — Exceção genérica escolhendo status HTTP
-**Antes.** `ServicoAutenticacao` lançava `InvalidOperationException` e o
-controller traduzia em `Conflict` dentro de `try/catch`.
-**Depois.** `ConflitoException` + middleware central.
-**Evidência.** HTTP 409 com `codigo: "conflito"`.
-
-### C-06 — Validação duplicada entre HTTP e domínio
-**Antes.** `[MinLength(6)]`, `[Range(0.01, …)]`, `[EmailAddress]` no modelo e
-regras equivalentes ausentes no domínio.
-**Depois.** Modelo só com `[Required]`; regra única no domínio.
-**Evidência.** `ModelosRequisicao.cs`; 400 com mensagem do domínio.
-
-### C-07 — Parse de sessão repetido em cada controller
-**Antes.** Cada controller teria seu `int.TryParse(claim)`.
-**Depois.** `ClaimsExtensions.ObterUsuarioId` — um dono para a conversão.
-**Evidência.** `Controller/ClaimsExtensions.cs`.
-
-### C-08 — Decisão de negócio codificada em condicional
-**Antes.** (projetado) `if (modalidade == Liquidacao) ... else if ...`.
-**Depois.** `IEstrategiaNegociacao` + 3 implementações injetadas.
-**Evidência.** `EstrategiasTests`; HTTP com resultados divergentes.
-
-### C-09 — Comparação de categoria por texto cru
-**Antes.** `string` livre, sensível a caixa e acento.
-**Depois.** `Categoria` com slug normalizado e unicidade por slug.
-**Evidência.** `CategoriaTests` (inclui `ánimé` → `anime`).
-
-### C-10 — Recusa de ofertas não modelada
-**Antes.** Não existia negociação; só criação de anúncio.
-**Depois.** `Proposta` com ciclo e recusa em cascata ao aceitar.
-**Evidência.** `ServicoPropostasTests.Aceitar_DeveRecusarAsDemaisPendentes`.
-
-## 3. O que foi preservado
-
-- Namespace `RarityRoom`, rotas `api/produtos` e `api/autenticacao`.
-- Autenticação por cookie `RarityRoom.Auth` (HttpOnly, SameSite=Lax).
-- CORS restrito a `http://localhost:5173`.
-- Contrato JSON do anúncio: todos os campos originais continuam presentes e
-  o frontend não precisou de alteração.
-- Hash PBKDF2 com salt (100 mil iterações) — já estava correto.
-
-## 4. Pendências de revisão (declaradas, não escondidas)
-
-| ID | Pendência | Impacto |
+| Arquivo | Finalidade na alteração | No escopo? |
 |---|---|---|
-| P-01 | ~~Repositórios repetem `lock` + cópia~~ — resolvido: produção usa EF Core, memória ficou só nos testes | removida a duplicação |
-| P-02 | Entidades são serializadas diretamente no JSON | qualquer propriedade nova vira contrato sem decisão |
-| P-03 | Busca e filtro acontecem no cliente | não escala com catálogo grande |
-| P-04 | ~~Sem persistência~~ — resolvido: SQLite + EF Core com migração versionada | dados sobrevivem ao reinício |
+| `ServicoPedidos.cs` | checkout a partir do carrinho (`Finalizar`), aprovação com baixa de estoque (`Aprovar`), PIX/boleto/cartão simulados, expiração, cancelamento | sim |
+| `IServicoPedidos.cs` | novo contrato do serviço (remove `Criar`/`Pagar`, adiciona `Finalizar`, `ObterCompra`, `SimularConfirmacao`, `PagarComCartao`, `SimularExpiracao`, `CancelarCompra`) | sim |
+| `PedidosController.cs` | `POST /api/pedidos` passa a receber `ModeloCheckout` (sem produto/preço/quantidade); remove `/pagar` | sim |
+| `PagamentosController.cs` (novo) | rotas da compra simulada (`/api/pagamentos/{id}`…) | sim |
 
-Nenhuma dessas pendências quebra regra de negócio; todas estão registradas em
-`auditoria-final.md`.
+**Mudanças fora do escopo estrito** identificadas no diff:
+
+1. `ServicoPedidos.Cancelar` passou a **devolver estoque** (`ReporEstoque`) ao
+   cancelar pedido pago. Não é checkout, mas é consequência obrigatória de
+   RN5 (se o estoque baixa no pagamento, o estorno precisa devolvê-lo).
+   Aceitável, porém deveria estar num commit próprio.
+2. Textos das notificações mudaram (passam a citar `pedido.Codigo`) —
+   cosmético, sem impacto em regra.
+3. **Omissão:** o commit não altera `ServicoAdmin.cs`, que usava
+   `Pedido.PrecoUnitario` (removido no commit anterior `f3b7cab`). Ver
+   impacto transitivo abaixo.
+
+## 4. Impacto e verificação (C04)
+
+| Tipo | Impacto | Verificação |
+|---|---|---|
+| Contrato HTTP | **quebra**: `POST /api/pedidos/{id}/pagar` deixa de existir; `POST /api/pedidos` muda o corpo (sem `produtoId`) e a resposta (compra com lista de pedidos) | frontend adaptado em `pedidosService.ts`; teste `Seguranca_PrecoEQuantidadeEnviadosPeloNavegadorSaoIgnorados` confirma que `/pagar` não responde 200 |
+| Contrato do serviço | `IServicoPedidos` trocou `Criar`/`Pagar` por 6 operações | único consumidor é o controller (busca no código) |
+| Dependências | construtor de `ServicoPedidos` passou de **4 para 9** dependências (repositórios de pagamento e carrinho, unidade de trabalho, `RegrasCompra`, `TimeProvider`) | registradas em `Program.cs` no commit `09d4a32` |
+| Comportamento | `Concluir` não muda mais o anúncio; o estoque muda no pagamento | `Pix_EstoqueSoBaixaDepoisDaAprovacao`, `Cartao_AprovadoGuardaSoFinal_ERecusadoNaoMexeNoEstoque`, `CancelarEExpirar_NaoBaixamEstoque` |
+| Concorrência | baixa de estoque dentro de transação | `ComprasSimultaneas_DoMesmoEstoque_SoUmaEhAprovada` |
+| **Transitivo** | o projeto **não compila** em `1b32db1`: `ServicoAdmin.cs(47,39): error CS1061: 'Pedido' não contém uma definição para "PrecoUnitario"` | verificado executando `dotnet build` com o repositório em `1b32db1` (1 erro); em `09d4a32` → **0 erros** |
+
+Verificação final no estado atual da `main`: `dotnet test` — todos os testes
+aprovados (ver `auditoria-final.md`).
+
+## 5. Avaliação pelas propriedades de POO (C05)
+
+| Propriedade | Avaliação | Evidência |
+|---|---|---|
+| **Encapsulamento** — positivo | a decisão "pagamento aprovado" saiu do cliente (`modelo.Aprovado`) e passou para o domínio/serviço; o estado de `Pagamento` só muda por `Aprovar/Recusar/Cancelar/Expirar` | diff do `PedidosController` |
+| **Encapsulamento** — problema | `Aprovar` lê `pedido.Itens`, que em `f3b7cab` era `List<ItemPedido>` pública: qualquer serviço poderia `pedido.Itens.Add(...)` e quebrar `Total = soma dos itens` | `Pedido.cs` em `1b32db1` |
+| **Coesão** — problema | `ServicoPedidos` (585 linhas em `1b32db1`) passou a cuidar de checkout, pagamento simulado (PIX, boleto, cartão, expiração) **e** do ciclo do pedido (envio, entrega, conclusão, cancelamento) | tamanho e lista de métodos públicos |
+| **Acoplamento** | subiu de 4 para 9 dependências, mas todas por interface (`IRepositorio*`, `IUnidadeDeTrabalho`), o que mantém o serviço testável | construtor |
+| **Responsabilidades** — positivo | a validação de compra foi extraída para `RegrasCompra`, usada também pelo carrinho: uma regra, um lugar | `regras.Problema(...)` em `Finalizar` e `Aprovar` |
+
+## 6. Decisão técnica (C06)
+
+**Decisão: CORRIGIR e então ACEITAR.**
+
+Fundamentação (fatos → julgamento):
+
+1. *Fato:* os requisitos RN4/RN5 e "aprovação pelo servidor" estão
+   implementados e verificados por testes (seção 4). → justifica aceitar o
+   comportamento.
+2. *Fato:* `Pedido.Itens` mutável permite violar a invariante do total. →
+   **correção obrigatória**, aplicada no commit `3a61de9`
+   (*itens do pedido expostos só para leitura*), com o teste
+   `Itens_NaoPodemSerAlteradosDeFora_PreservandoOTotal`.
+3. *Fato:* o commit não compila isoladamente (erro CS1061 em `ServicoAdmin`).
+   → correção já presente em `09d4a32`; registrado como lição de processo:
+   commits devem compilar sozinhos.
+4. *Julgamento:* a queda de coesão de `ServicoPedidos` não quebra regra nem
+   teste. → **não bloqueia**; registrada como pendência (extrair um
+   `ServicoPagamentos`) em `auditoria-final.md`.
