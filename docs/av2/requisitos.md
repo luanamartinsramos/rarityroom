@@ -1,94 +1,81 @@
 # Requisitos — RarityRoom
 
-Documento de requisitos verificáveis do marketplace de colecionáveis geek.
-Cada requisito tem identificador estável e aponta para a evidência que o
-comprova (arquivo, teste ou chamada HTTP).
+Requisitos funcionais e não funcionais do marketplace. Os **três fluxos** e as
+**cinco regras de negócio principais**, com critérios de aceitação e
+rastreabilidade, estão em [`especificacao.md`](especificacao.md). Este
+documento lista o restante, sempre com a evidência que o comprova.
 
 ## 1. Objetivo
 
-Permitir que colecionadores anunciem, negociem e comprem itens geek, com
-regras de negócio aplicadas pelo domínio e não pela interface.
+Permitir que colecionadores anunciem, negociem e comprem itens geek, com as
+regras de negócio aplicadas pelo domínio no backend, e não pela interface.
 
 ## 2. Escopo
 
-**Dentro:** contas, catálogo de categorias, anúncios com ciclo de vida,
-negociação por propostas, favoritos, autenticação por cookie.
+**Dentro:** contas e autenticação por cookie; catálogo com busca, filtros,
+7 ordenações e paginação no servidor; anúncios com ciclo de vida e
+reabastecimento; negociação por propostas; favoritos; carrinho no servidor;
+checkout; **pagamento simulado** (PIX, boleto e cartão, sem gateway real);
+pedidos com pós-venda e avaliação por item; lojas, perfil, endereços,
+notificações e administração; upload de imagem.
 
-**Fora (registrado como limitação):** pagamento, envio, upload de imagem,
-paginação e busca no servidor.
+**Fora (limitações declaradas):** pagamento real e cálculo de frete;
+expiração de PIX/boleto feita sob demanda (ao consultar), sem processo em
+segundo plano; banco apenas SQLite.
 
 ## 3. Requisitos funcionais
 
 | ID | Requisito | Evidência |
 |---|---|---|
 | RF01 | Cadastrar usuário com nome, e-mail e senha | `ServicoAutenticacao.Cadastrar`; `ServicoAutenticacaoTests` |
-| RF02 | Autenticar por e-mail e senha, mantendo sessão por cookie | `AutenticacaoController.Entrar`; cookie `RarityRoom.Auth` |
+| RF02 | Autenticar e manter sessão por cookie | `AutenticacaoController.Entrar`; cookie `RarityRoom.Auth` |
 | RF03 | Encerrar sessão | `AutenticacaoController.Sair` |
 | RF04 | Consultar o usuário autenticado | `GET /api/autenticacao/usuário-atual` |
-| RF05 | Listar o catálogo de anúncios sem exigir login | `GET /api/produtos`; verificado HTTP 200 anônimo |
-| RF06 | Consultar um anúncio por identificador | `GET /api/produtos/{id}` |
-| RF07 | Publicar anúncio vinculado ao autor | `POST /api/produtos`; `Produto.UsuarioId` |
-| RF08 | Editar anúncio | `PUT /api/produtos/{id}`; `ServicoAnuncios.Atualizar` |
-| RF09 | Excluir anúncio | `DELETE /api/produtos/{id}`; `ServicoAnuncios.Remover` |
-| RF10 | Alterar o estado do anúncio | `PATCH /api/produtos/{id}/estado` |
-| RF11 | Listar e cadastrar categorias | `CategoriasController`; 7 categorias semeadas |
-| RF12 | Favoritar e desfavoritar anúncio | `FavoritosController` |
-| RF13 | Listar os próprios favoritos | `GET /api/favoritos` |
-| RF14 | Enviar proposta de compra | `POST /api/propostas` |
-| RF15 | Aceitar, recusar e cancelar proposta | `POST /api/propostas/{id}/aceitar|recusar|cancelar` |
-| RF16 | Listar propostas enviadas e recebidas | `ServicoPropostas.Listar` |
-| RF17 | Registrar pedido de compra com snapshot de nome e preço | `Pedido`; `FluxoApiTests` |
-| RF18 | Concluir pedido (somente o vendedor) | `ServicoPedidos.Concluir` |
-| RF19 | Cancelar pedido (comprador ou vendedor) | `ServicoPedidos.Cancelar` |
-| RF20 | Avaliar vendedor após pedido concluído | `Avaliacao`; `AvaliacoesController` |
-| RF21 | Consultar reputação do vendedor | `GET /api/avaliacoes/vendedor/{id}` |
-| RF22 | Enviar imagem do anúncio | `POST /api/produtos/{id}/imagem` |
-| RF23 | Pesquisar o catálogo por termo, categoria e estado | `GET /api/produtos?termo=&categoria=&estado=` |
-| RF24 | Escolher tipo de conta no cadastro (comprador ou vendedor) | `ModeloCadastro.TipoConta`; `FluxoApiTests` |
-| RF25 | Finalizar compra com endereço de entrega e forma de pagamento | `POST /api/pedidos`; `DadosEntrega` |
+| RF05 | Pesquisar o catálogo por termo (palavras em qualquer ordem, nome parcial, sem acento), categoria, preço e destaque | `ServicoAnuncios.Listar`; `Pesquisa_ExistenteInexistenteParcialEPalavrasForaDeOrdem` |
+| RF06 | Ordenar por relevância, menor/maior preço, mais recentes/antigos, mais vendidos e melhor avaliados, com paginação (`X-Total-Count`) | `Ordenacao_PrecoEDataEPaginacao`, `Ordenacao_MaisVendidosEMelhorAvaliados_UsamDadosReais` |
+| RF07 | Consultar um anúncio com vendedor, vendas e avaliações reais | `GET /api/produtos/{id}` (`ProdutoCatalogo`) |
+| RF08 | Publicar, editar, mudar estado e excluir anúncio (FL1) | `ProdutosController`; RN1/RN2 |
+| RF09 | Reabastecer anúncio esgotado | `POST /api/produtos/{id}/reabastecer`; `ReabastecerApiTests` |
+| RF10 | Listar os próprios anúncios em qualquer estado | `GET /api/produtos/meus`; `Vitrine_NaoMostraAnuncioEsgotado` |
+| RF11 | Listar e cadastrar categorias | `CategoriasController`; 15 categorias semeadas |
+| RF12 | Favoritar, desfavoritar e listar favoritos | `FavoritosController`; `ServicoFavoritosTests` |
+| RF13 | Enviar, aceitar, recusar e cancelar proposta (FL2) | `PropostasController`; `ServicoPropostasTests` |
+| RF14 | Carrinho no servidor: adicionar, alterar quantidade, remover, limpar | `CarrinhoController`; `Carrinho_AdicionarAlterarRemover_ERespeitarEstoque`, `Carrinho_PersisteEntreSessoes` |
+| RF15 | Checkout a partir do carrinho com endereço e forma de pagamento (FL3) | `POST /api/pedidos`; `Checkout_DeveGuardarEntregaEPagamento` |
+| RF16 | Pagamento simulado por PIX (QR e copia e cola fictícios), boleto (linha digitável fictícia) e cartão (validação, parcelas) | `PagamentosController`; `Pix_…`, `Boleto_…`, `Cartao_…` |
+| RF17 | Cancelar compra aguardando pagamento e expirar PIX/boleto | `CancelarEExpirar_NaoBaixamEstoque` |
+| RF18 | Histórico de compras e detalhe do pedido | `GET /api/pedidos`, `GET /api/pedidos/{id}` |
+| RF19 | Pós-venda: enviar (vendedor), confirmar entrega (comprador), concluir (vendedor), cancelar com estorno | `ServicoPedidos.Enviar/Entregar/Concluir/Cancelar`; `CancelarPedidoPago_DevolveEstoque` |
+| RF20 | Avaliar cada item após receber o pedido; reputação do vendedor e média do produto | `AvaliacoesController`; `AvaliacaoDoProduto_DeveAlimentarAMedia` |
+| RF21 | Enviar imagem do anúncio | `POST /api/produtos/{id}/imagem`; `Upload_Valido_DeveGravarImagemNoDisco` |
+| RF22 | Loja, perfil, endereços, recuperação de senha, notificações e painel de administração | controllers correspondentes; `FluxoApiTests` |
 
 ## 4. Regras de negócio
 
+As cinco principais (**RN1–RN5**) e as complementares (**RC1–RC6**) estão
+especificadas, com critérios de aceitação, em `especificacao.md`. Regras
+adicionais, também implementadas no domínio e testadas:
+
 | ID | Regra | Onde vive | Teste |
 |---|---|---|---|
-| RN01 | Anúncio exige título, descrição opcional, preço > 0, estoque ≥ 0 e categoria existente | `Produto` + `ServicoAnuncios` | `ProdutoValidacaoTests`, `ServicoAnunciosCategoriaTests` |
-| RN02 | Só o proprietário edita, exclui ou muda o estado | `Produto.ValidarPropriedade` | `ProdutoPropriedadeTests`, `ServicoAnunciosTests` |
-| RN03 | Anúncio vendido não pode ser editado nem excluído | `Produto.Atualizar`, `ValidarExclusao` | `ProdutoTransicoesTests` |
-| RN04 | Transições de estado só ocorrem pelo par (origem, operação) | `Produto.Transicoes` | `ProdutoTransicoesTests` |
-| RN05 | Não vender anúncio sem estoque | `Produto.AplicarOperacao` | `ProdutoTransicoesTests` |
-| RN06 | Usuário não favorita o próprio anúncio, nem duplica favorito | `Favorito` + `ServicoFavoritos` | `FavoritoTests`, `ServicoFavoritosTests` |
-| RN07 | Categoria é única pelo slug (ignora acento e caixa) | `Categoria.GerarSlug` + `ServicoCategorias` | `CategoriaTests` |
-| RN08 | Proposta exige valor > 0 e não pode ser feita no próprio anúncio | `Proposta` + `ServicoPropostas` | `PropostaTests`, `ServicoPropostasTests` |
-| RN09 | Só anúncio disponível recebe proposta | `ServicoPropostas.Criar` | `ServicoPropostasTests` |
-| RN10 | Aceite depende da modalidade de negociação | `IEstrategiaNegociacao` | `EstrategiasTests`, `ServicoPropostasTests` |
-| RN11 | Aceitar uma proposta recusa as demais pendentes do anúncio | `ServicoPropostas.RecusarDemaisPendentes` | `ServicoPropostasTests` |
-| RN12 | Só o proponente cancela a própria proposta | `Proposta.ValidarProponente` | `PropostaTests` |
-| RN13 | E-mail de usuário é único, ignorando caixa | `ServicoAutenticacao` + repositório | `ServicoAutenticacaoTests` |
-| RN14 | Senha nunca é armazenada em texto puro | `HashSenha` (PBKDF2 + salt) | `ServicoAutenticacaoTests` |
-| RN15 | Pedido guarda nome e preço do momento da compra | `Pedido` | `PedidoTests` |
-| RN16 | Um anúncio tem no máximo um pedido pendente | `ServicoPedidos.Criar` | `FluxoApiTests` |
-| RN17 | Não comprar o próprio anúncio | `Pedido` | `PedidoTests` |
-| RN18 | Avaliação exige pedido concluído, do comprador, nota 1–5, uma por pedido | `Avaliacao` + `ServicoAvaliacoes` | `AvaliacaoTests` |
-| RN19 | Imagem até 2 MB, JPG/PNG/WEBP, nome gerado pelo servidor | `ServicoImagensArquivo` | `FluxoApiTests` |
-| RN20 | Conta de comprador não publica anúncio | `ServicoAnuncios.Criar` | `FluxoApiTests` |
-| RN21 | Conta de vendedor não compra | `ServicoPedidos.Criar` | `FluxoApiTests` |
-| RN22 | Pedido exige endereço válido (CEP 8 dígitos, UF 2 letras) e forma de pagamento | `DadosEntrega` | `FluxoApiTests` |
+| RA1 | Anúncio exige nome ≥ 3, preço > 0, estoque ≥ 0 e categoria cadastrada | `Produto` + `ServicoAnuncios` | `ProdutoValidacaoTests`, `ServicoAnunciosCategoriaTests` |
+| RA2 | Anúncio vendido não pode ser editado nem excluído | `Produto.Atualizar`, `ValidarExclusao` | `Atualizar_AnuncioVendido_DeveFalhar`, `ValidarExclusao_AnuncioVendido_DeveFalhar` |
+| RA3 | Usuário não favorita o próprio anúncio nem duplica favorito | `Favorito` + `ServicoFavoritos` | `FavoritoTests`, `ServicoFavoritosTests` |
+| RA4 | Categoria é única pelo slug (ignora acento e caixa) | `Categoria.GerarSlug` | `CategoriaTests` |
+| RA5 | Proposta exige valor > 0, anúncio disponível e de outro usuário; aceitar recusa as demais pendentes | `Proposta` + `ServicoPropostas` | `PropostaTests`, `ServicoPropostasTests` |
+| RA6 | E-mail único (ignora caixa) e senha só em hash PBKDF2 | `ServicoAutenticacao`, `HashSenha` | `ServicoAutenticacaoTests` |
+| RA7 | Endereço de entrega válido (CEP 8 dígitos, UF 2 letras) | `DadosEntrega.Criar` | `Checkout_SemEndereco_DeveRetornar400` |
+| RA8 | Do cartão só ficam os 4 últimos dígitos, a bandeira e as parcelas | `Pagamento.RegistrarCartao`, `ValidadorCartao` | `Cartao_AprovadoGuardaSoFinal_ERecusadoNaoMexeNoEstoque` |
+| RA9 | Pedidos e pagamentos só são visíveis para quem participa | `Pedido.Participa`, `ServicoPedidos` | `Seguranca_PedidoEPagamentoDeOutroUsuario_SaoNegados` |
+| RA10 | Imagem até 2 MB, JPG/PNG/WEBP, nome gerado pelo servidor | `ServicoImagensArquivo` | `Upload_DeFormatoInvalido_DeveRetornar400` |
 
 ## 5. Requisitos não funcionais
 
 | ID | Requisito | Evidência |
 |---|---|---|
-| RNF01 | Erros de negócio respondem com status coerente e código estável | `MiddlewareExcecoes`; 400/403/404/409 observados |
-| RNF02 | Identificadores de entidade nunca se repetem | `RepositorioProdutoTests`; HTTP id 4 após excluir id 2 |
-| RNF03 | Repositórios são seguros sob concorrência | `Adicionar_EmParalelo_DeveGerarIdsUnicos` (200 threads) |
-| RNF04 | Listas internas não escapam do repositório | `ObterTodos_DeveDevolverCopiaDaLista` |
-| RNF05 | Compilação sem avisos | `dotnet build` — 0 avisos, 0 erros |
-| RNF06 | Suíte automatizada executável e verde | `dotnet test` — 154 aprovados, 15 de integração |
-| RNF07 | Dados persistem entre reinícios | SQLite + migração; verificado parando e subindo o servidor |
-
-## 6. Critérios de aceitação globais
-
-1. `dotnet build` sem erros nem avisos.
-2. `dotnet test` com 100% de aprovação.
-3. Fluxo completo por HTTP: cadastro → login → anúncio → proposta → aceite.
-4. Nenhuma regra de negócio implementada apenas no controller.
+| RNF01 | Erros respondem `ProblemDetails` com status coerente e código estável, sem vazar detalhes internos | `MiddlewareExcecoes`; `excecoes.md`; `S3_FalhaInesperada_…` |
+| RNF02 | Consistência sob concorrência: o mesmo estoque nunca é vendido duas vezes | `UnidadeDeTrabalhoEf` + token de concorrência; `ComprasSimultaneas_DoMesmoEstoque_SoUmaEhAprovada` |
+| RNF03 | Identificadores nunca se repetem | autoincremento SQLite; `Adicionar_AposExcluirUltimo_NaoDeveReutilizarId` |
+| RNF04 | Dados persistem entre reinícios; banco preparado automaticamente | SQLite + `Database.Migrate()` na inicialização |
+| RNF05 | Backend compila sem erros nem avisos | `dotnet build` → 0 avisos, 0 erros |
+| RNF06 | Suíte automatizada executável a partir de um clone limpo | `cd tests/RarityRoom.Tests && dotnet test` (ver `auditoria-final.md`) |
