@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 
 import { obterVendedor, type VendedorApi } from "../../services/catalogoService";
 
+import { urlImagem } from "../../utils/formato";
 import "../shared/paginas.css";
 
 function VendedorPagina() {
@@ -67,7 +68,7 @@ function VendedorPagina() {
           <div className="vendedor-avatar">
             {vendedor.loja.fotoUrl ? (
               <img
-                src={vendedor.loja.fotoUrl}
+                src={urlImagem(vendedor.loja.fotoUrl)}
                 alt={vendedor.loja.nome}
                 style={{ width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover" }}
               />
@@ -117,7 +118,7 @@ function VendedorPagina() {
             >
               <div className="cartao-produto-imagem">
                 {anuncio.imagemUrl ? (
-                  <img src={anuncio.imagemUrl} alt={anuncio.nome} />
+                  <img src={urlImagem(anuncio.imagemUrl)} alt={anuncio.nome} />
                 ) : (
                   <span>◇</span>
                 )}

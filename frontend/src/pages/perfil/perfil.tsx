@@ -18,6 +18,7 @@ import {
   type PerfilApi,
 } from "../../services/perfilService";
 
+import { urlImagem } from "../../utils/formato";
 import "../shared/paginas.css";
 
 const ENDERECO_VAZIO: EnderecoForm = {
@@ -175,7 +176,7 @@ function PerfilPagina() {
           <div className="vendedor-avatar">
             {perfil.fotoUrl ? (
               <img
-                src={perfil.fotoUrl}
+                src={urlImagem(perfil.fotoUrl)}
                 alt={perfil.nome}
                 style={{
                   width: "100%",
