@@ -25,3 +25,14 @@ export async function removerFavorito(produtoId: number): Promise<void> {
     throw new Error("Não foi possível remover o favorito.");
   }
 }
+
+export async function adicionarFavorito(produtoId: number): Promise<void> {
+  const resposta = await fetch(`${API}/${produtoId}`, {
+    method: "POST",
+    credentials: "include",
+  });
+
+  if (!resposta.ok) {
+    throw new Error("Não foi possível favoritar.");
+  }
+}
