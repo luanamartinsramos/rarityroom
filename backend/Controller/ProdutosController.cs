@@ -1,69 +1,89 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using RarityRoom.Modelos;
-using RarityRoom.Repositorios;
+using RarityRoom.Modelos.Enums;
+using RarityRoom.Modelos.Excecoes;
+using RarityRoom.Servicos;
 
 namespace RarityRoom.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize]
 public class ProdutosController : ControllerBase
 {
-    private readonly IRepositorioProduto repositorioProduto;
+    private readonly IServicoAnuncios servicoAnuncios;
+
+    private readonly IServicoImagens servicoImagens;
 
     public ProdutosController(
-        IRepositorioProduto repositorioProduto)
+        IServicoAnuncios servicoAnuncios,
+        IServicoImagens servicoImagens)
     {
-        this.repositorioProduto = repositorioProduto;
+        this.servicoAnuncios = servicoAnuncios;
+        this.servicoImagens = servicoImagens;
     }
 
+    /// <summary>
+    /// Vitrine pública: visitante precisa ver o catálogo. Antes o controller
+    /// inteiro exigia autenticação e a home mostrava erro para quem não havia
+    /// feito login.
+    /// </summary>
+    /// <summary>
+    /// Vitrine pública com pesquisa. Sem parâmetros devolve o catálogo
+    /// completo; com parâmetros filtra no servidor.
+    /// </summary>
     [HttpGet]
-    public IActionResult ObterTodos()
+    public IActionResult ObterTodos(
+        [FromQuery] string? termo,
+        [FromQuery] string? categoria,
+        [FromQuery] string? estado,
+        [FromQuery] string? franquia,
+        [FromQuery] string? condicao,
+        [FromQuery] decimal? precoMin,
+        [FromQuery] decimal? precoMax,
+        [FromQuery] string? ordem,
+        [FromQuery] bool? destaque,
+        [FromQuery] int pagina = 1,
+        [FromQuery] int tamanhoPagina = 0)
     {
-        var produtos = repositorioProduto.ObterTodos();
+        var filtro = new FiltroAnuncios(
+            termo,
+            categoria,
+            estado,
+            franquia,
+            condicao,
+            precoMin,
+            precoMax,
+            ordem,
+            destaque,
+            pagina,
+            tamanhoPagina);
 
-        return Ok(produtos);
+        if (tamanhoPagina <= 0)
+        {
+            return Ok(servicoAnuncios.Listar(filtro));
+        }
+
+        var resultado = servicoAnuncios.ListarPaginado(filtro);
+
+        Response.Headers["X-Total-Count"] = resultado.Total.ToString();
+
+        return Ok(resultado.Itens);
     }
 
     [HttpGet("{id}")]
     public IActionResult ObterPorId(int id)
     {
-        var produto = repositorioProduto.ObterPorId(id);
-
-        if (produto == null)
-        {
-            return NotFound(new
-            {
-                mensagem = "Produto não encontrado."
-            });
-        }
-
-        return Ok(produto);
+        return Ok(servicoAnuncios.ObterPorId(id));
     }
 
     [HttpPost]
-    public IActionResult Criar(
-        ModeloProduto modelo)
+    [Authorize]
+    public IActionResult Criar(ModeloProduto modelo)
     {
-        int id = repositorioProduto
-            .ObterTodos()
-            .Count + 1;
-
-        var produto = new Produto(
-            id,
-            modelo.Nome,
-            modelo.Descricao,
-            modelo.Preco,
-            modelo.Estoque,
-            modelo.Categoria,
-            modelo.Marca,
-            modelo.Colecao,
-            modelo.Condicao,
-            modelo.ImagemUrl
-        );
-
-        repositorioProduto.Adicionar(produto);
+        var produto = servicoAnuncios.Criar(
+            ParaDados(modelo),
+            User.ObterUsuarioId());
 
         return CreatedAtAction(
             nameof(ObterPorId),
@@ -73,21 +93,72 @@ public class ProdutosController : ControllerBase
     }
 
     [HttpPut("{id}")]
-    public IActionResult Atualizar(
-        int id,
-        ModeloProduto modelo)
+    [Authorize]
+    public IActionResult Atualizar(int id, ModeloProduto modelo)
     {
-        var produto = repositorioProduto.ObterPorId(id);
+        var produto = servicoAnuncios.Atualizar(
+            id,
+            ParaDados(modelo),
+            User.ObterUsuarioId());
 
-        if (produto == null)
+        return Ok(produto);
+    }
+
+    [HttpPatch("{id}/estado")]
+    [Authorize]
+    public IActionResult AlterarEstado(int id, ModeloEstadoAnuncio modelo)
+    {
+        var produto = servicoAnuncios.AlterarEstado(
+            id,
+            OperacaoDe(modelo.Operacao),
+            User.ObterUsuarioId());
+
+        return Ok(produto);
+    }
+
+    [HttpDelete("{id}")]
+    [Authorize]
+    public IActionResult Remover(int id)
+    {
+        servicoAnuncios.Remover(id, User.ObterUsuarioId());
+
+        return Ok(new
         {
-            return NotFound(new
-            {
-                mensagem = "Produto não encontrado."
-            });
+            mensagem = "Produto removido com sucesso."
+        });
+    }
+
+    /// <summary>
+    /// Envia a imagem do anúncio. O arquivo é validado por tamanho e tipo, e o
+    /// nome final é gerado pelo servidor.
+    /// </summary>
+    [HttpPost("{id}/imagem")]
+    [Authorize]
+    public async Task<IActionResult> EnviarImagem(int id, IFormFile arquivo)
+    {
+        if (arquivo == null || arquivo.Length == 0)
+        {
+            throw new ValidacaoException("Envie um arquivo de imagem.");
         }
 
-        produto.Atualizar(
+        await using Stream conteudo = arquivo.OpenReadStream();
+
+        string caminho = await servicoImagens.SalvarAsync(
+            conteudo,
+            arquivo.ContentType,
+            arquivo.Length);
+
+        var produto = servicoAnuncios.DefinirImagem(
+            id,
+            caminho,
+            User.ObterUsuarioId());
+
+        return Ok(produto);
+    }
+
+    private static DadosAnuncio ParaDados(ModeloProduto modelo)
+    {
+        return new DadosAnuncio(
             modelo.Nome,
             modelo.Descricao,
             modelo.Preco,
@@ -96,30 +167,70 @@ public class ProdutosController : ControllerBase
             modelo.Marca,
             modelo.Colecao,
             modelo.Condicao,
-            modelo.ImagemUrl
+            modelo.ImagemUrl,
+            ModalidadeDe(modelo.Modalidade),
+            modelo.Franquia,
+            RaridadeDe(modelo.Raridade),
+            modelo.EdicaoLimitada,
+            modelo.Destaque
         );
-
-        repositorioProduto.Atualizar(produto);
-
-        return Ok(produto);
     }
 
-    [HttpDelete("{id}")]
-    public IActionResult Remover(int id)
+    private static OperacaoAnuncio OperacaoDe(string operacao)
     {
-        bool removido = repositorioProduto.Remover(id);
+        bool valida = Enum.TryParse(
+            operacao,
+            ignoreCase: true,
+            out OperacaoAnuncio resultado);
 
-        if (!removido)
+        if (!valida || !Enum.IsDefined(resultado))
         {
-            return NotFound(new
-            {
-                mensagem = "Produto não encontrado."
-            });
+            throw new ValidacaoException(
+                "Operação inválida. Use reservar, vender, pausar, reativar ou cancelarReserva.");
         }
 
-        return Ok(new
+        return resultado;
+    }
+
+    private static ModalidadeNegociacao ModalidadeDe(string modalidade)
+    {
+        if (string.IsNullOrWhiteSpace(modalidade))
         {
-            mensagem = "Produto removido com sucesso."
-        });
+            return ModalidadeNegociacao.PrecoFixo;
+        }
+
+        bool valida = Enum.TryParse(
+            modalidade,
+            ignoreCase: true,
+            out ModalidadeNegociacao resultado);
+
+        if (!valida || !Enum.IsDefined(resultado))
+        {
+            throw new ValidacaoException(
+                "Modalidade inválida. Use PrecoFixo, AceitaOferta ou Liquidacao.");
+        }
+
+        return resultado;
+    }
+
+    private static Raridade RaridadeDe(string raridade)
+    {
+        if (string.IsNullOrWhiteSpace(raridade))
+        {
+            return Raridade.Comum;
+        }
+
+        bool valida = Enum.TryParse(
+            raridade,
+            ignoreCase: true,
+            out Raridade resultado);
+
+        if (!valida || !Enum.IsDefined(resultado))
+        {
+            throw new ValidacaoException(
+                "Raridade inválida. Use Comum, Raro, Epico ou Lendario.");
+        }
+
+        return resultado;
     }
 }
