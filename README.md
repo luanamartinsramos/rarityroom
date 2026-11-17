@@ -300,6 +300,32 @@ Estados do pagamento: aguardando pagamento, aprovado, recusado, expirado,
 compra cancelada e estornado (pedido pago cancelado antes do envio; as
 unidades voltam ao estoque).
 
+# 🌐 Publicação online (Vercel + Render)
+
+A Vercel hospeda só o **frontend**; o **backend** (.NET) roda no **Render**
+(plano gratuito, a partir do `backend/Dockerfile`). A Vercel repassa `/api` e
+`/uploads` para o Render (`frontend/vercel.json`), então o site funciona como
+um domínio só e o login por cookie não precisa de CORS.
+
+1. **Backend (Render):** <https://dashboard.render.com> → **New → Blueprint** →
+   escolha este repositório. O `render.yaml` cria o serviço `rarityroom-api`.
+   Se o Render der outro endereço que não `https://rarityroom-api.onrender.com`,
+   troque-o nos dois `destination` de `frontend/vercel.json`.
+2. **Frontend (Vercel):** <https://vercel.com/new> → importe este repositório →
+   em **Root Directory** escolha `frontend` → **Deploy**.
+
+Limitações do plano gratuito do Render:
+- o backend "dorme" após 15 min sem acesso; o primeiro acesso depois disso
+  leva ~1 minuto;
+- o SQLite fica no disco temporário do container: **os dados (contas, anúncios,
+  pedidos) são apagados quando o serviço reinicia ou é publicado de novo**.
+  As categorias e a conta `admin@rarityroom.com` / `admin123` são recriadas
+  automaticamente. Para dados permanentes é preciso um disco persistente
+  (plano pago) ou outro banco.
+
+Localmente nada muda: o frontend usa `http://localhost:5000` em modo
+desenvolvimento (pode ser trocado com a variável `VITE_API_ORIGIN`).
+
 # 📚 Documentação AV2
 
 | Arquivo | Conteúdo |
