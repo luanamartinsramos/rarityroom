@@ -5,7 +5,7 @@ namespace RarityRoom.Modelos;
 /// que permite ao cliente desenhar a navegação por páginas.
 /// </summary>
 public record PaginaCatalogo(
-    List<Produto> Itens,
+    List<ProdutoCatalogo> Itens,
     int Total,
     int Pagina,
     int TamanhoPagina);

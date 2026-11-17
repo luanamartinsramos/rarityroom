@@ -90,11 +90,13 @@ public class ModeloProposta
     public string Mensagem { get; set; } = string.Empty;
 }
 
-public class ModeloPedido
+/// <summary>
+/// Checkout a partir do carrinho do usuário autenticado. Não há produto,
+/// preço ou quantidade aqui de propósito: tudo é lido do carrinho e dos
+/// anúncios no servidor, então o navegador não consegue manipular valores.
+/// </summary>
+public class ModeloCheckout
 {
-    [Required]
-    public int ProdutoId { get; set; }
-
     public string Cep { get; set; } = string.Empty;
 
     public string Logradouro { get; set; } = string.Empty;
@@ -111,6 +113,45 @@ public class ModeloPedido
 
     /// <summary>Pix, CartaoCredito ou Boleto.</summary>
     public string FormaPagamento { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Identificador da tentativa gerado pelo cliente. Reenviar a mesma chave
+    /// devolve a compra já criada em vez de duplicá-la.
+    /// </summary>
+    public string ChaveIdempotencia { get; set; } = string.Empty;
+}
+
+public class ModeloItemCarrinho
+{
+    [Required]
+    public int ProdutoId { get; set; }
+
+    public int Quantidade { get; set; } = 1;
+}
+
+public class ModeloQuantidade
+{
+    public int Quantidade { get; set; }
+}
+
+/// <summary>
+/// Dados do cartão da simulação. Trafegam só para validação: nada além dos
+/// 4 últimos dígitos e da bandeira é gravado.
+/// </summary>
+public class ModeloCartao
+{
+    public string NomeImpresso { get; set; } = string.Empty;
+
+    public string Numero { get; set; } = string.Empty;
+
+    /// <summary>MM/AA.</summary>
+    public string Validade { get; set; } = string.Empty;
+
+    public string Cvv { get; set; } = string.Empty;
+
+    public string Cpf { get; set; } = string.Empty;
+
+    public int Parcelas { get; set; } = 1;
 }
 
 public class ModeloNome
@@ -187,12 +228,6 @@ public class ModeloLoja
     public string Descricao { get; set; } = string.Empty;
 }
 
-public class ModeloPagamento
-{
-    /// <summary>Resultado da simulação de pagamento.</summary>
-    public bool Aprovado { get; set; } = true;
-}
-
 public class ModeloAvaliacao
 {
     [Required]
@@ -202,4 +237,7 @@ public class ModeloAvaliacao
     public int Nota { get; set; }
 
     public string Comentario { get; set; } = string.Empty;
+
+    /// <summary>Item do pedido avaliado. Opcional: zero avalia o primeiro.</summary>
+    public int ProdutoId { get; set; }
 }
