@@ -458,6 +458,26 @@ public class ServicoAnuncios : IServicoAnuncios
         return produto;
     }
 
+    /// <summary>
+    /// Reposição de estoque (RN-REAB). Só o dono; a regra de estado e de
+    /// quantidade é do próprio anúncio.
+    /// </summary>
+    public Produto Reabastecer(int id, int quantidade, int solicitanteId)
+    {
+        var produto = ObterPorId(id);
+
+        produto.ValidarPropriedade(solicitanteId);
+
+        produto.Reabastecer(quantidade);
+
+        if (!repositorioProduto.Atualizar(produto))
+        {
+            throw new NaoEncontradoException("Anúncio não encontrado.");
+        }
+
+        return produto;
+    }
+
     public Produto DefinirImagem(int id, string imagemUrl, int solicitanteId)
     {
         var produto = ObterPorId(id);

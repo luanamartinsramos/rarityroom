@@ -21,6 +21,8 @@ public interface IServicoAnuncios
 
     Produto AlterarEstado(int id, OperacaoAnuncio operacao, int solicitanteId);
 
+    Produto Reabastecer(int id, int quantidade, int solicitanteId);
+
     Produto DefinirImagem(int id, string imagemUrl, int solicitanteId);
 
     void Remover(int id, int solicitanteId);

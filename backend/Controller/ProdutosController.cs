@@ -116,6 +116,17 @@ public class ProdutosController : ControllerBase
         return Ok(produto);
     }
 
+    /// <summary>
+    /// Repõe unidades de um anúncio (só o dono). Anúncio esgotado volta a
+    /// ficar disponível.
+    /// </summary>
+    [HttpPost("{id:int}/reabastecer")]
+    [Authorize]
+    public IActionResult Reabastecer(int id, ModeloQuantidade modelo)
+    {
+        return Ok(servicoAnuncios.Reabastecer(id, modelo.Quantidade, User.ObterUsuarioId()));
+    }
+
     [HttpDelete("{id}")]
     [Authorize]
     public IActionResult Remover(int id)
