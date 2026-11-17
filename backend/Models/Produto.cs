@@ -311,6 +311,37 @@ public class Produto
         }
     }
 
+    private const int MaximoReabastecimento = 1000;
+
+    /// <summary>
+    /// Reposição de estoque pelo vendedor (RN-REAB). Anúncio esgotado
+    /// (Vendido) volta a ficar disponível; Disponível e Pausado só somam
+    /// unidades. Reservado é recusado: há uma proposta aceita em andamento.
+    /// A validação acontece antes de qualquer alteração, então uma recusa
+    /// nunca deixa o anúncio pela metade.
+    /// </summary>
+    public void Reabastecer(int quantidade)
+    {
+        if (quantidade <= 0 || quantidade > MaximoReabastecimento)
+        {
+            throw new ValidacaoException(
+                $"Informe entre 1 e {MaximoReabastecimento} unidades para repor.");
+        }
+
+        if (Estado == EstadoAnuncio.Reservado)
+        {
+            throw new TransicaoInvalidaException(
+                "Não é possível repor estoque de um anúncio reservado por proposta aceita.");
+        }
+
+        Estoque += quantidade;
+
+        if (Estado == EstadoAnuncio.Vendido)
+        {
+            Estado = EstadoAnuncio.Disponivel;
+        }
+    }
+
     /// <summary>
     /// Devolve unidades ao estoque quando uma compra já paga é cancelada
     /// (estorno simulado). Um anúncio que havia esgotado volta a ficar
