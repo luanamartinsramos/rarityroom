@@ -17,6 +17,7 @@ import {
 } from "../../services/pedidosService";
 import { obterNotificacoes } from "../../services/notificacoesService";
 import { obterCarrinho, ouvirCarrinho } from "../../services/carrinhoService";
+import { requisitar } from "../../services/api";
 import { adicionarComAviso } from "../../services/carrinhoAcoes";
 import {
   adicionarFavorito,
@@ -381,6 +382,30 @@ function Home() {
       toast.error("Não foi possível conectar ao servidor.");
     } finally {
       setSavingProduct(false);
+    }
+  }
+
+  /** Repor estoque (RN-REAB): o servidor valida dono, estado e quantidade. */
+  async function reabastecer(produto: Produto) {
+    const resposta = window.prompt(
+      `Quantas unidades de "${produto.nome}" você quer repor? (1 a 1000)`,
+      "1",
+    );
+
+    if (resposta === null) {
+      return;
+    }
+
+    try {
+      await requisitar(`/produtos/${produto.id}/reabastecer`, {
+        metodo: "POST",
+        corpo: { quantidade: Number(resposta) },
+      });
+
+      toast.success("Estoque reposto! ✨");
+      await loadProducts();
+    } catch (falha) {
+      toast.error(falha instanceof Error ? falha.message : "Não foi possível repor o estoque.");
     }
   }
 
@@ -1124,8 +1149,14 @@ function Home() {
                     </div>
 
                     <div className="seller-item-actions">
-                      <button onClick={() => openEditProduct(produto)}>
-                        Editar
+                      {produto.estado !== "Vendido" && (
+                        <button onClick={() => openEditProduct(produto)}>
+                          Editar
+                        </button>
+                      )}
+
+                      <button onClick={() => void reabastecer(produto)}>
+                        Repor estoque
                       </button>
 
                       <button onClick={() => handleDeleteProduct(produto.id)}>
