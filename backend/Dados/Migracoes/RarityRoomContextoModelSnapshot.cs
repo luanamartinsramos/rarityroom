@@ -48,12 +48,12 @@ namespace RarityRoom.Dados.Migracoes
 
                     b.HasKey("Id");
 
-                    b.HasIndex("PedidoId")
-                        .IsUnique();
-
                     b.HasIndex("ProdutoId");
 
                     b.HasIndex("VendedorId");
+
+                    b.HasIndex("PedidoId", "ProdutoId")
+                        .IsUnique();
 
                     b.ToTable("avaliacoes", (string)null);
                 });
@@ -162,6 +162,32 @@ namespace RarityRoom.Dados.Migracoes
                     b.ToTable("favoritos", (string)null);
                 });
 
+            modelBuilder.Entity("RarityRoom.Modelos.ItemCarrinho", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("AdicionadoEm")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("ProdutoId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Quantidade")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("UsuarioId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UsuarioId", "ProdutoId")
+                        .IsUnique();
+
+                    b.ToTable("itens_carrinho", (string)null);
+                });
+
             modelBuilder.Entity("RarityRoom.Modelos.Loja", b =>
                 {
                     b.Property<int>("Id")
@@ -229,6 +255,86 @@ namespace RarityRoom.Dados.Migracoes
                     b.ToTable("notificacoes", (string)null);
                 });
 
+            modelBuilder.Entity("RarityRoom.Modelos.Pagamento", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("CartaoBandeira")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CartaoFinal")
+                        .IsRequired()
+                        .HasMaxLength(4)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ChaveIdempotencia")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Codigo")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CodigoPix")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("CompradorId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("ExpiraEm")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Forma")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("LinhaDigitavel")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Motivo")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Parcelas")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("ProcessadoEm")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("Valor")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Codigo")
+                        .IsUnique();
+
+                    b.HasIndex("CompradorId", "ChaveIdempotencia")
+                        .IsUnique();
+
+                    b.ToTable("pagamentos", (string)null);
+                });
+
             modelBuilder.Entity("RarityRoom.Modelos.Pedido", b =>
                 {
                     b.Property<int>("Id")
@@ -236,6 +342,11 @@ namespace RarityRoom.Dados.Migracoes
                         .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("CanceladoEm")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Codigo")
+                        .IsRequired()
+                        .HasMaxLength(20)
                         .HasColumnType("TEXT");
 
                     b.Property<int>("CompradorId")
@@ -257,20 +368,18 @@ namespace RarityRoom.Dados.Migracoes
                         .HasMaxLength(20)
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("NomeProduto")
-                        .IsRequired()
-                        .HasMaxLength(120)
-                        .HasColumnType("TEXT");
-
-                    b.Property<decimal>("PrecoUnitario")
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("ProdutoId")
+                    b.Property<int?>("PagamentoId")
                         .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("PagoEm")
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("StatusPagamento")
                         .IsRequired()
                         .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("Total")
                         .HasColumnType("TEXT");
 
                     b.Property<int>("VendedorId")
@@ -278,9 +387,12 @@ namespace RarityRoom.Dados.Migracoes
 
                     b.HasKey("Id");
 
+                    b.HasIndex("Codigo")
+                        .IsUnique();
+
                     b.HasIndex("CompradorId");
 
-                    b.HasIndex("ProdutoId");
+                    b.HasIndex("PagamentoId");
 
                     b.HasIndex("VendedorId");
 
@@ -328,6 +440,7 @@ namespace RarityRoom.Dados.Migracoes
                         .HasColumnType("TEXT");
 
                     b.Property<int>("Estoque")
+                        .IsConcurrencyToken()
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("Franquia")
@@ -542,8 +655,50 @@ namespace RarityRoom.Dados.Migracoes
                                 .HasForeignKey("PedidoId");
                         });
 
+                    b.OwnsMany("RarityRoom.Modelos.ItemPedido", "Itens", b1 =>
+                        {
+                            b1.Property<int>("Id")
+                                .ValueGeneratedOnAdd()
+                                .HasColumnType("INTEGER");
+
+                            b1.Property<string>("ImagemUrl")
+                                .IsRequired()
+                                .HasMaxLength(500)
+                                .HasColumnType("TEXT");
+
+                            b1.Property<string>("NomeProduto")
+                                .IsRequired()
+                                .HasMaxLength(120)
+                                .HasColumnType("TEXT");
+
+                            b1.Property<int>("PedidoId")
+                                .HasColumnType("INTEGER");
+
+                            b1.Property<decimal>("PrecoUnitario")
+                                .HasColumnType("TEXT");
+
+                            b1.Property<int>("ProdutoId")
+                                .HasColumnType("INTEGER");
+
+                            b1.Property<int>("Quantidade")
+                                .HasColumnType("INTEGER");
+
+                            b1.HasKey("Id");
+
+                            b1.HasIndex("PedidoId");
+
+                            b1.HasIndex("ProdutoId");
+
+                            b1.ToTable("itens_pedido", (string)null);
+
+                            b1.WithOwner()
+                                .HasForeignKey("PedidoId");
+                        });
+
                     b.Navigation("Entrega")
                         .IsRequired();
+
+                    b.Navigation("Itens");
                 });
 #pragma warning restore 612, 618
         }

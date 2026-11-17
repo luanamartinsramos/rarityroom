@@ -36,6 +36,10 @@ public class RarityRoomContexto : DbContext
 
     public DbSet<RecuperacaoSenha> RecuperacoesSenha => Set<RecuperacaoSenha>();
 
+    public DbSet<ItemCarrinho> ItensCarrinho => Set<ItemCarrinho>();
+
+    public DbSet<Pagamento> Pagamentos => Set<Pagamento>();
+
     protected override void OnModelCreating(ModelBuilder construtor)
     {
         ConfigurarUsuario(construtor);
@@ -49,6 +53,8 @@ public class RarityRoomContexto : DbContext
         ConfigurarLoja(construtor);
         ConfigurarEndereco(construtor);
         ConfigurarRecuperacaoSenha(construtor);
+        ConfigurarCarrinho(construtor);
+        ConfigurarPagamento(construtor);
     }
 
     private static void ConfigurarUsuario(ModelBuilder construtor)
@@ -128,7 +134,12 @@ public class RarityRoomContexto : DbContext
                 .IsRequired()
                 .HasColumnType("TEXT");
 
-            entidade.Property(produto => produto.Estoque).IsRequired();
+            // Token de concorrência: se duas operações lerem o mesmo estoque e
+            // tentarem gravá-lo, a segunda falha em vez de sobrescrever a
+            // primeira (UPDATE ... WHERE Estoque = valor lido).
+            entidade.Property(produto => produto.Estoque)
+                .IsRequired()
+                .IsConcurrencyToken();
 
             entidade.Property(produto => produto.Categoria)
                 .IsRequired()
@@ -210,18 +221,50 @@ public class RarityRoomContexto : DbContext
             entidade.ToTable("pedidos");
             entidade.HasKey(pedido => pedido.Id);
 
-            entidade.Property(pedido => pedido.ProdutoId).IsRequired();
+            entidade.Property(pedido => pedido.Codigo)
+                .IsRequired()
+                .HasMaxLength(20);
+
+            entidade.HasIndex(pedido => pedido.Codigo).IsUnique();
+
             entidade.Property(pedido => pedido.CompradorId).IsRequired();
             entidade.Property(pedido => pedido.VendedorId).IsRequired();
 
-            // Snapshot: nome e preço congelados no momento da compra.
-            entidade.Property(pedido => pedido.NomeProduto)
-                .IsRequired()
-                .HasMaxLength(120);
-
-            entidade.Property(pedido => pedido.PrecoUnitario)
+            entidade.Property(pedido => pedido.Total)
                 .IsRequired()
                 .HasColumnType("TEXT");
+
+            // Propriedades calculadas a partir dos itens.
+            entidade.Ignore(pedido => pedido.NomeProduto);
+            entidade.Ignore(pedido => pedido.QuantidadeTotal);
+
+            // Itens com snapshot de nome, imagem e preço do momento da compra.
+            entidade.OwnsMany(pedido => pedido.Itens, item =>
+            {
+                item.ToTable("itens_pedido");
+                item.WithOwner().HasForeignKey("PedidoId");
+                item.HasKey(atual => atual.Id);
+
+                item.Property(atual => atual.ProdutoId).IsRequired();
+
+                item.Property(atual => atual.NomeProduto)
+                    .IsRequired()
+                    .HasMaxLength(120);
+
+                item.Property(atual => atual.ImagemUrl).HasMaxLength(500);
+
+                item.Property(atual => atual.PrecoUnitario)
+                    .IsRequired()
+                    .HasColumnType("TEXT");
+
+                item.Property(atual => atual.Quantidade).IsRequired();
+
+                item.Ignore(atual => atual.Subtotal);
+
+                item.HasIndex(atual => atual.ProdutoId);
+            });
+
+            entidade.Navigation(pedido => pedido.Itens).AutoInclude();
 
             entidade.Property(pedido => pedido.Estado)
                 .IsRequired()
@@ -278,7 +321,7 @@ public class RarityRoomContexto : DbContext
 
             entidade.Property(pedido => pedido.CriadoEm).IsRequired();
 
-            entidade.HasIndex(pedido => pedido.ProdutoId);
+            entidade.HasIndex(pedido => pedido.PagamentoId);
             entidade.HasIndex(pedido => pedido.CompradorId);
             entidade.HasIndex(pedido => pedido.VendedorId);
         });
@@ -299,8 +342,10 @@ public class RarityRoomContexto : DbContext
             entidade.Property(avaliacao => avaliacao.Comentario).HasMaxLength(500);
             entidade.Property(avaliacao => avaliacao.CriadaEm).IsRequired();
 
-            // Uma compra, uma avaliação — garantido também no banco.
-            entidade.HasIndex(avaliacao => avaliacao.PedidoId).IsUnique();
+            // Cada item comprado recebe no máximo uma avaliação.
+            entidade
+                .HasIndex(avaliacao => new { avaliacao.PedidoId, avaliacao.ProdutoId })
+                .IsUnique();
             entidade.HasIndex(avaliacao => avaliacao.VendedorId);
             entidade.HasIndex(avaliacao => avaliacao.ProdutoId);
         });
@@ -391,6 +436,82 @@ public class RarityRoomContexto : DbContext
             entidade.Property(recuperacao => recuperacao.Usada).IsRequired();
 
             entidade.HasIndex(recuperacao => recuperacao.Token).IsUnique();
+        });
+    }
+
+    private static void ConfigurarCarrinho(ModelBuilder construtor)
+    {
+        construtor.Entity<ItemCarrinho>(entidade =>
+        {
+            entidade.ToTable("itens_carrinho");
+            entidade.HasKey(item => item.Id);
+
+            entidade.Property(item => item.UsuarioId).IsRequired();
+            entidade.Property(item => item.ProdutoId).IsRequired();
+            entidade.Property(item => item.Quantidade).IsRequired();
+            entidade.Property(item => item.AdicionadoEm).IsRequired();
+
+            // Um anúncio aparece uma vez por carrinho; repetir soma quantidade.
+            entidade
+                .HasIndex(item => new { item.UsuarioId, item.ProdutoId })
+                .IsUnique();
+        });
+    }
+
+    private static void ConfigurarPagamento(ModelBuilder construtor)
+    {
+        construtor.Entity<Pagamento>(entidade =>
+        {
+            entidade.ToTable("pagamentos");
+            entidade.HasKey(pagamento => pagamento.Id);
+
+            entidade.Property(pagamento => pagamento.Codigo)
+                .IsRequired()
+                .HasMaxLength(20);
+
+            entidade.HasIndex(pagamento => pagamento.Codigo).IsUnique();
+
+            entidade.Property(pagamento => pagamento.CompradorId).IsRequired();
+
+            entidade.Property(pagamento => pagamento.Forma)
+                .IsRequired()
+                .HasConversion<string>()
+                .HasMaxLength(20);
+
+            entidade.Property(pagamento => pagamento.Status)
+                .IsRequired()
+                .HasConversion<string>()
+                .HasMaxLength(20);
+
+            entidade.Property(pagamento => pagamento.Valor)
+                .IsRequired()
+                .HasColumnType("TEXT");
+
+            entidade.Property(pagamento => pagamento.Parcelas).IsRequired();
+            entidade.Property(pagamento => pagamento.CriadoEm).IsRequired();
+            entidade.Property(pagamento => pagamento.ExpiraEm).IsRequired();
+
+            entidade.Property(pagamento => pagamento.CodigoPix).HasMaxLength(300);
+            entidade.Property(pagamento => pagamento.LinhaDigitavel).HasMaxLength(60);
+
+            // Do cartão, só o que pode ser exibido: nunca número completo,
+            // validade ou CVV.
+            entidade.Property(pagamento => pagamento.CartaoFinal).HasMaxLength(4);
+            entidade.Property(pagamento => pagamento.CartaoBandeira).HasMaxLength(20);
+
+            entidade.Property(pagamento => pagamento.Motivo).HasMaxLength(300);
+
+            entidade.Property(pagamento => pagamento.ChaveIdempotencia)
+                .IsRequired()
+                .HasMaxLength(64);
+
+            // A mesma tentativa de checkout não gera duas compras.
+            entidade
+                .HasIndex(pagamento => new { pagamento.CompradorId, pagamento.ChaveIdempotencia })
+                .IsUnique();
+
+            entidade.Ignore(pagamento => pagamento.AguardandoPagamento);
+            entidade.Ignore(pagamento => pagamento.ValorParcela);
         });
     }
 }
