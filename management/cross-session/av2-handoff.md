@@ -1,3 +1,9 @@
+> **Registro histórico.** Este arquivo guarda as anotações de passagem de
+> sessão feitas durante o desenvolvimento e descreve estados **antigos** do
+> projeto (contagens de testes, regras e limitações que mudaram depois). O
+> estado atual e verificado está em `docs/av2/auditoria-final.md` e o índice
+> de evidências em `docs/av2/evidencias.json`.
+
 # Handoff — Adequação do RarityRoom à AV2 (POO)
 
 **Criado em:** 2026-11-14
