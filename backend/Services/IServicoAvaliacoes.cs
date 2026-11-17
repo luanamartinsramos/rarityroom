@@ -8,7 +8,8 @@ public interface IServicoAvaliacoes
         int pedidoId,
         int autorId,
         int nota,
-        string comentario);
+        string comentario,
+        int produtoId = 0);
 
     ReputacaoVendedor ObterReputacao(int vendedorId);
 

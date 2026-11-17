@@ -24,7 +24,8 @@ public class AvaliacoesController : ControllerBase
             modelo.PedidoId,
             User.ObterUsuarioId(),
             modelo.Nota,
-            modelo.Comentario);
+            modelo.Comentario,
+            modelo.ProdutoId);
 
         return StatusCode(StatusCodes.Status201Created, avaliacao);
     }

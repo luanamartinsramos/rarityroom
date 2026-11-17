@@ -5,7 +5,7 @@ namespace RarityRoom.Modelos;
 
 /// <summary>
 /// Avaliação do comprador sobre o vendedor, vinculada a um pedido concluído.
-/// A nota pertence ao pedido: uma compra gera no máximo uma avaliação.
+/// Cada item de um pedido recebe no máximo uma avaliação.
 /// </summary>
 public class Avaliacao
 {
@@ -37,24 +37,41 @@ public class Avaliacao
     {
     }
 
+    /// <param name="produtoId">
+    /// Item do pedido que está sendo avaliado. Zero avalia o primeiro item.
+    /// </param>
     public Avaliacao(
         Pedido pedido,
         int autorId,
         int nota,
-        string comentario)
+        string comentario,
+        int produtoId = 0)
     {
         ArgumentNullException.ThrowIfNull(pedido);
 
-        if (pedido.Estado != EstadoPedido.Concluido)
+        // Pode avaliar quem recebeu o produto: entrega confirmada ou pedido
+        // concluído.
+        if (pedido.Estado != EstadoPedido.Concluido
+            && pedido.Estado != EstadoPedido.Entregue)
         {
             throw new ConflitoException(
-                "Só é possível avaliar um pedido concluído.");
+                "Só é possível avaliar depois de receber o pedido.");
         }
 
         if (pedido.CompradorId != autorId)
         {
             throw new AcessoNegadoException(
                 "Somente o comprador pode avaliar este pedido.");
+        }
+
+        var item = produtoId <= 0
+            ? pedido.Itens.FirstOrDefault()
+            : pedido.Itens.FirstOrDefault(atual => atual.ProdutoId == produtoId);
+
+        if (item == null)
+        {
+            throw new ValidacaoException(
+                "O produto avaliado não faz parte deste pedido.");
         }
 
         if (nota < NotaMinima || nota > NotaMaxima)
@@ -72,7 +89,7 @@ public class Avaliacao
         }
 
         PedidoId = pedido.Id;
-        ProdutoId = pedido.ProdutoId;
+        ProdutoId = item.ProdutoId;
         AutorId = autorId;
         VendedorId = pedido.VendedorId;
         Nota = nota;

@@ -4,7 +4,7 @@ namespace RarityRoom.Repositorios;
 
 public interface IRepositorioAvaliacao
 {
-    Avaliacao? ObterPorPedido(int pedidoId);
+    Avaliacao? ObterPorPedido(int pedidoId, int produtoId);
 
     List<Avaliacao> ObterPorVendedor(int vendedorId);
 

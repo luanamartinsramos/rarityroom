@@ -13,10 +13,11 @@ public class RepositorioAvaliacaoEf : IRepositorioAvaliacao
         this.contexto = contexto;
     }
 
-    public Avaliacao? ObterPorPedido(int pedidoId)
+    public Avaliacao? ObterPorPedido(int pedidoId, int produtoId)
     {
         return contexto.Avaliacoes.FirstOrDefault(
-            avaliacao => avaliacao.PedidoId == pedidoId);
+            avaliacao => avaliacao.PedidoId == pedidoId
+                && avaliacao.ProdutoId == produtoId);
     }
 
     public List<Avaliacao> ObterPorVendedor(int vendedorId)

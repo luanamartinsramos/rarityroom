@@ -22,7 +22,8 @@ public class ServicoAvaliacoes : IServicoAvaliacoes
         int pedidoId,
         int autorId,
         int nota,
-        string comentario)
+        string comentario,
+        int produtoId = 0)
     {
         var pedido = repositorioPedido.ObterPorId(pedidoId);
 
@@ -31,12 +32,12 @@ public class ServicoAvaliacoes : IServicoAvaliacoes
             throw new NaoEncontradoException("Pedido não encontrado.");
         }
 
-        if (repositorioAvaliacao.ObterPorPedido(pedidoId) != null)
-        {
-            throw new ConflitoException("Este pedido já foi avaliado.");
-        }
+        var avaliacao = new Avaliacao(pedido, autorId, nota, comentario, produtoId);
 
-        var avaliacao = new Avaliacao(pedido, autorId, nota, comentario);
+        if (repositorioAvaliacao.ObterPorPedido(pedidoId, avaliacao.ProdutoId) != null)
+        {
+            throw new ConflitoException("Este item do pedido já foi avaliado.");
+        }
 
         return repositorioAvaliacao.Adicionar(avaliacao);
     }
