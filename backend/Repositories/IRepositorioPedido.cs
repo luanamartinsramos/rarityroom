@@ -12,7 +12,7 @@ public interface IRepositorioPedido
 
     List<Pedido> ObterPorVendedor(int vendedorId);
 
-    Pedido? ObterPendentePorProduto(int produtoId);
+    List<Pedido> ObterPorPagamento(int pagamentoId);
 
     Pedido Adicionar(Pedido pedido);
 
