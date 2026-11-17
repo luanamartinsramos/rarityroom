@@ -24,11 +24,6 @@ public class ProdutosController : ControllerBase
     }
 
     /// <summary>
-    /// Vitrine pública: visitante precisa ver o catálogo. Antes o controller
-    /// inteiro exigia autenticação e a home mostrava erro para quem não havia
-    /// feito login.
-    /// </summary>
-    /// <summary>
     /// Vitrine pública com pesquisa. Sem parâmetros devolve o catálogo
     /// completo; com parâmetros filtra no servidor.
     /// </summary>
@@ -59,11 +54,8 @@ public class ProdutosController : ControllerBase
             pagina,
             tamanhoPagina);
 
-        if (tamanhoPagina <= 0)
-        {
-            return Ok(servicoAnuncios.Listar(filtro));
-        }
-
+        // Sempre devolve os itens com vendedor, vendas e avaliações reais; o
+        // total filtrado vai no cabeçalho para a paginação do cliente.
         var resultado = servicoAnuncios.ListarPaginado(filtro);
 
         Response.Headers["X-Total-Count"] = resultado.Total.ToString();
@@ -71,10 +63,18 @@ public class ProdutosController : ControllerBase
         return Ok(resultado.Itens);
     }
 
-    [HttpGet("{id}")]
+    /// <summary>Anúncios do usuário autenticado, em qualquer estado.</summary>
+    [HttpGet("meus")]
+    [Authorize]
+    public IActionResult Meus()
+    {
+        return Ok(servicoAnuncios.ListarDoUsuario(User.ObterUsuarioId()));
+    }
+
+    [HttpGet("{id:int}")]
     public IActionResult ObterPorId(int id)
     {
-        return Ok(servicoAnuncios.ObterPorId(id));
+        return Ok(servicoAnuncios.ObterDetalhe(id));
     }
 
     [HttpPost]

@@ -51,4 +51,30 @@ public static class BuscaTexto
     {
         return Normalizar(texto) == valorNormalizado;
     }
+
+    private static readonly HashSet<string> PalavrasVazias = new(StringComparer.Ordinal)
+    {
+        "a", "o", "as", "os", "de", "da", "do", "das", "dos", "e",
+        "em", "no", "na", "nos", "nas", "com", "para", "por", "um", "uma"
+    };
+
+    /// <summary>
+    /// Quebra o termo em palavras normalizadas. Palavras como "de" e "com"
+    /// são ignoradas, a menos que o termo seja só elas.
+    /// </summary>
+    public static List<string> Tokens(string? termo)
+    {
+        var palavras = Normalizar(termo)
+            .Split(
+                new[] { ' ', '\t', ',', ';', '.', '-', '/', '(', ')', ':', '!', '?', '"', '\'' },
+                StringSplitOptions.RemoveEmptyEntries)
+            .Distinct()
+            .ToList();
+
+        var relevantes = palavras
+            .Where(palavra => !PalavrasVazias.Contains(palavra))
+            .ToList();
+
+        return relevantes.Count > 0 ? relevantes : palavras;
+    }
 }

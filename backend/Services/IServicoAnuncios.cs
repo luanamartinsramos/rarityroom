@@ -11,6 +11,10 @@ public interface IServicoAnuncios
 
     Produto ObterPorId(int id);
 
+    ProdutoCatalogo ObterDetalhe(int id);
+
+    List<ProdutoCatalogo> ListarDoUsuario(int usuarioId);
+
     Produto Criar(DadosAnuncio dados, int proprietarioId);
 
     Produto Atualizar(int id, DadosAnuncio dados, int solicitanteId);
