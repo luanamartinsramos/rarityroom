@@ -29,7 +29,8 @@ builder.Services.AddCors(options =>
           .WithOrigins("http://localhost:5173")
           .AllowAnyHeader()
           .AllowAnyMethod()
-          .AllowCredentials();
+          .AllowCredentials()
+          .WithExposedHeaders("X-Total-Count");
   });
 });
 
@@ -56,6 +57,13 @@ builder.Services.AddScoped<IRepositorioNotificacao, RepositorioNotificacaoEf>();
 builder.Services.AddScoped<IRepositorioLoja, RepositorioLojaEf>();
 builder.Services.AddScoped<IRepositorioEndereco, RepositorioEnderecoEf>();
 builder.Services.AddScoped<IRepositorioRecuperacaoSenha, RepositorioRecuperacaoSenhaEf>();
+builder.Services.AddScoped<IRepositorioCarrinho, RepositorioCarrinhoEf>();
+builder.Services.AddScoped<IRepositorioPagamento, RepositorioPagamentoEf>();
+builder.Services.AddScoped<IEstatisticasCatalogo, EstatisticasCatalogoEf>();
+builder.Services.AddScoped<IUnidadeDeTrabalho, UnidadeDeTrabalhoEf>();
+builder.Services.AddScoped<RegrasCompra>();
+builder.Services.AddScoped<IServicoCarrinho, ServicoCarrinho>();
+builder.Services.AddSingleton(TimeProvider.System);
 
 builder.Services.AddScoped<IServicoAutenticacao, ServicoAutenticacao>();
 builder.Services.AddScoped<IServicoAnuncios, ServicoAnuncios>();

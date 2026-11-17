@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Mvc;
 using RarityRoom.Modelos.Excecoes;
 
@@ -42,6 +43,22 @@ public class MiddlewareExcecoes
                 StatusDe(excecao),
                 excecao.Codigo,
                 excecao.Message);
+        }
+        catch (DbUpdateConcurrencyException excecao)
+        {
+            // Duas operações tentaram gravar o mesmo estoque ao mesmo tempo:
+            // a segunda é rejeitada em vez de sobrescrever a primeira.
+            logger.LogWarning(
+                excecao,
+                "Conflito de concorrência em {Metodo} {Caminho}",
+                contexto.Request.Method,
+                contexto.Request.Path);
+
+            await EscreverAsync(
+                contexto,
+                StatusCodes.Status409Conflict,
+                "concorrencia",
+                "O estoque foi alterado por outra compra neste instante. Atualize a página e tente novamente.");
         }
         catch (Exception excecao)
         {

@@ -43,8 +43,9 @@ public class ServicoAdmin : IServicoAdmin
             anuncios.Count(anuncio => anuncio.Estado == EstadoAnuncio.Vendido),
             pedidos.Count,
             pedidos
-                .Where(pedido => pedido.Estado == EstadoPedido.Concluido)
-                .Sum(pedido => pedido.PrecoUnitario));
+                .Where(pedido => pedido.StatusPagamento == StatusPagamento.Pago
+                    && pedido.Estado != EstadoPedido.Cancelado)
+                .Sum(pedido => pedido.Total));
     }
 
     public List<UsuarioAdmin> ListarUsuarios(int solicitanteId)
