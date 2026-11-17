@@ -275,6 +275,63 @@ public class Produto
     }
 
     /// <summary>
+    /// Baixa definitiva do estoque, feita somente quando o pagamento simulado é
+    /// aprovado. Nunca deixa o estoque negativo: pedir mais do que existe falha.
+    /// Ao zerar, o anúncio vira "Vendido"; se estava reservado por proposta e
+    /// ainda sobram unidades, volta a ficar disponível para os demais.
+    /// </summary>
+    public void BaixarEstoque(int quantidade)
+    {
+        if (quantidade <= 0)
+        {
+            throw new ValidacaoException("A quantidade deve ser maior que zero.");
+        }
+
+        if (Estado != EstadoAnuncio.Disponivel && Estado != EstadoAnuncio.Reservado)
+        {
+            throw new ConflitoException(
+                $"\"{Nome}\" não está mais disponível para compra.");
+        }
+
+        if (quantidade > Estoque)
+        {
+            throw new ConflitoException(
+                $"Estoque insuficiente para \"{Nome}\": restam {Estoque} unidade(s).");
+        }
+
+        Estoque -= quantidade;
+
+        if (Estoque == 0)
+        {
+            Estado = EstadoAnuncio.Vendido;
+        }
+        else if (Estado == EstadoAnuncio.Reservado)
+        {
+            Estado = EstadoAnuncio.Disponivel;
+        }
+    }
+
+    /// <summary>
+    /// Devolve unidades ao estoque quando uma compra já paga é cancelada
+    /// (estorno simulado). Um anúncio que havia esgotado volta a ficar
+    /// disponível.
+    /// </summary>
+    public void ReporEstoque(int quantidade)
+    {
+        if (quantidade <= 0)
+        {
+            throw new ValidacaoException("A quantidade deve ser maior que zero.");
+        }
+
+        Estoque += quantidade;
+
+        if (Estado == EstadoAnuncio.Vendido)
+        {
+            Estado = EstadoAnuncio.Disponivel;
+        }
+    }
+
+    /// <summary>
     /// Define a imagem do anúncio. Aceita URL absoluta ou o caminho relativo
     /// produzido pelo serviço de imagens.
     /// </summary>
