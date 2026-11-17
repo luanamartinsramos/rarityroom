@@ -82,4 +82,50 @@ valendo para os demais campos).
 
 ## 8. Execução e inspeção do resultado
 
-*(preenchida após a execução — ver commits seguintes no histórico Git)*
+### 8.1 Execução
+
+A especificação foi escrita e versionada **antes** da implementação (commit
+`5d228b8`). A execução seguiu o plano da seção 7, com um agente de código
+(Claude Code) atuando sob esta especificação. O texto não depende de
+ferramenta e pode ser entregue como está ao DsCode.
+
+| Passo do plano | Commit | Conteúdo |
+|---|---|---|
+| — | `5d228b8` | esta especificação |
+| 1–2 | `3e77f5b` | `Produto.Reabastecer` + `ProdutoReabastecerTests` (R1–R4) |
+| 3 | `54f4775` | `ServicoAnuncios.Reabastecer`, `POST /api/produtos/{id}/reabastecer`, `ReabastecerApiTests` |
+| 4 | `35e8232` | botão **Repor estoque** em "Vender → Meus anúncios" |
+
+Diff total da alteração (`git diff --stat 5d228b8 35e8232`): 7 arquivos,
++265/−2. Os arquivos tocados são os previstos no escopo (domínio, serviço,
+controller, tela e testes); nenhum arquivo de checkout, carrinho, pagamento
+ou migração foi alterado.
+
+### 8.2 Evidência de verificação
+
+**Teste antes da implementação (passo 1).** Com o método ainda lançando
+`NotImplementedException`:
+`Com falha! – Com falha: 6, Aprovado: 0, Total: 6` → depois de implementar:
+`Aprovado! – Com falha: 0, Aprovado: 6, Total: 6`.
+
+| Critério | Verificado por | Resultado |
+|---|---|---|
+| CA1 | `CA1_DonoReabasteceAnuncioEsgotado_VoltaAoCatalogo` (API: compra esgota → reabastece 5 → relê estoque 5/`Disponivel` → aparece na busca) e `R1_AnuncioEsgotado_VoltaADisponivelComONovoEstoque` | aprovado |
+| CA2 | `R2_AnuncioPausado_SomaEstoqueSemMudarEstado` | aprovado |
+| CA3 | `CA3_CA4_CA5_Recusas_NaoAlteramOAnuncio` (409 `transicao-invalida`, estoque 2 e `Reservado` na releitura) e `R3_AnuncioReservado_EhRecusadoSemAlterarNada` | aprovado |
+| CA4 | mesmo teste de API (0 e 1001 → 400) e `R4_QuantidadeForaDaFaixa_EhRecusadaSemAlterarNada` (0, −1, 1001) | aprovado |
+| CA5 | mesmo teste de API (terceiro → 403) | aprovado |
+| CA6 | `dotnet test` completo | 100% aprovado (contagem em `auditoria-final.md`) |
+
+### 8.3 Inspeção do resultado
+
+| Verificação | Resultado |
+|---|---|
+| Regra fora do escopo preservada (RN03: anúncio vendido não é editável) | `Atualizar_AnuncioVendido_DeveFalhar` continua aprovado; na tela, "Editar" fica oculto para anúncio vendido e "Repor estoque" aparece |
+| Sem migração | `dotnet ef migrations has-pending-model-changes` → "No changes have been made to the model since the last migration." |
+| Regra no domínio, não no controller | o controller só chama `servicoAnuncios.Reabastecer`; a validação de faixa e de estado está em `Produto.Reabastecer` e a de dono em `ValidarPropriedade` |
+| Recusa não altera o objeto | as validações acontecem antes de `Estoque +=`, provado pelos testes R3/R4 que releem estoque e estado |
+| Frontend | `npx tsc --noEmit` e `npm run build` sem erros |
+
+**Decisão sobre o resultado:** aceito. Todos os critérios de aceitação foram
+verificados por testes automatizados, sem mudanças fora do escopo.
