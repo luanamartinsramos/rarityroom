@@ -12,7 +12,7 @@ function ProtectedRoute({ children }: ProtectedRouteProps) {
     async function checkAuthentication() {
       try {
         const response = await fetch(
-          "http://localhost:5000/api/autenticacao/usuário-atual",
+          "/api/autenticacao/usuario-atual",
           {
             method: "GET",
             credentials: "include",

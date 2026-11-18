@@ -15,7 +15,7 @@ export function etapaAtual(estado: string): number {
 }
 
 export async function obterMeuId(): Promise<number> {
-  const resposta = await fetch("http://localhost:5000/api/autenticacao/usuário-atual", {
+  const resposta = await fetch("/api/autenticacao/usuario-atual", {
     credentials: "include",
   });
 

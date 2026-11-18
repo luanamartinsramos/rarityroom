@@ -1,6 +1,6 @@
 import type { Produto } from "./produtosService";
 
-const API = "http://localhost:5000/api/favoritos";
+const API = "/api/favoritos";
 
 export async function obterFavoritos(): Promise<Produto[]> {
   const resposta = await fetch(API, {

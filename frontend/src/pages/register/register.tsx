@@ -58,8 +58,13 @@ function Register() {
       return false;
     }
 
-    if (password.length < 6) {
-      toast.error("Sua senha precisa ter pelo menos 6 caracteres.");
+    if (password.length < 8) {
+      toast.error("Sua senha precisa ter pelo menos 8 caracteres.");
+      return false;
+    }
+
+    if (!/[A-Za-zÀ-ÿ]/.test(password) || !/\d/.test(password)) {
+      toast.error("Sua senha precisa ter pelo menos uma letra e um número.");
       return false;
     }
 
@@ -94,7 +99,7 @@ function Register() {
 
     try {
       const response = await fetch(
-        "http://localhost:5000/api/autenticacao/cadastrar",
+        "/api/autenticacao/cadastrar",
         {
           method: "POST",
           headers: {
@@ -153,9 +158,9 @@ function Register() {
                   if (field === "Senha") {
                     if (
                       lowerMessage.includes("minimum") ||
-                      lowerMessage.includes("6")
+                      lowerMessage.includes("8")
                     ) {
-                      return "Sua senha precisa ter pelo menos 6 caracteres.";
+                      return "Sua senha precisa ter pelo menos 8 caracteres.";
                     }
 
                     if (lowerMessage.includes("required")) {

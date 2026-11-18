@@ -1,0 +1,13 @@
+.git
+**/node_modules
+**/bin
+**/obj
+**/*.db
+**/*.db-shm
+**/*.db-wal
+backend/wwwroot/uploads
+backend/Properties
+frontend/dist
+tests
+docs
+management

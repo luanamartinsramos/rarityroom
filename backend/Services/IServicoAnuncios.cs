@@ -24,4 +24,11 @@ public interface IServicoAnuncios
     Produto DefinirImagem(int id, string imagemUrl, int solicitanteId);
 
     void Remover(int id, int solicitanteId);
+
+    /// <summary>
+    /// Lança 404/403 se o anúncio não existe ou não pertence ao solicitante.
+    /// Usado antes de gravar arquivos, para que um upload recusado não deixe
+    /// lixo no disco.
+    /// </summary>
+    void GarantirDono(int id, int solicitanteId);
 }

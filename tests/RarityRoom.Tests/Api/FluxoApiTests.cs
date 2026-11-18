@@ -548,7 +548,7 @@ public class FluxoApiTests
 
         var login = await administrador.PostAsJsonAsync(
             "/api/autenticacao/entrar",
-            new { email = "admin@rarityroom.com", senha = "admin123" });
+            new { email = "admin@rarityroom.com", senha = FabricaApi.SenhaAdmin });
 
         Assert.Equal(HttpStatusCode.OK, login.StatusCode);
 
@@ -582,7 +582,7 @@ public class FluxoApiTests
 
         await administrador.PostAsJsonAsync(
             "/api/autenticacao/entrar",
-            new { email = "admin@rarityroom.com", senha = "admin123" });
+            new { email = "admin@rarityroom.com", senha = FabricaApi.SenhaAdmin });
 
         var usuarios = await administrador.GetFromJsonAsync<JsonElement[]>(
             "/api/admin/usuarios");
@@ -686,7 +686,7 @@ public class FluxoApiTests
 
         var email = await cliente.PutAsJsonAsync(
             "/api/perfil/email",
-            new { email = novoEmail });
+            new { email = novoEmail, senhaAtual = "senha123" });
 
         Assert.Equal(HttpStatusCode.OK, email.StatusCode);
 
@@ -763,7 +763,10 @@ public class FluxoApiTests
 
         var corpo = await pedido.Content.ReadFromJsonAsync<JsonElement>();
 
-        string token = corpo.GetProperty("token").GetString()!;
+        // O token nunca volta na resposta: chega só pelo "e-mail".
+        Assert.False(corpo.TryGetProperty("token", out _));
+
+        string token = fabrica.CaixaDeEmail.UltimoToken(email)!;
 
         Assert.False(string.IsNullOrWhiteSpace(token));
 

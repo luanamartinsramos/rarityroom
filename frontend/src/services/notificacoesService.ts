@@ -12,7 +12,7 @@ export interface CentralNotificacoes {
   itens: NotificacaoApi[];
 }
 
-const API = "http://localhost:5000/api/notificacoes";
+const API = "/api/notificacoes";
 
 export async function obterNotificacoes(): Promise<CentralNotificacoes> {
   const resposta = await fetch(API, {

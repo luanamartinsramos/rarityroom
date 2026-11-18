@@ -15,7 +15,7 @@ import {
 import "../shared/paginas.css";
 import "../shared/compra.css";
 
-const API_FAVORITOS = "http://localhost:5000/api/favoritos";
+const API_FAVORITOS = "/api/favoritos";
 
 /**
  * A chave pelo id faz a página recomeçar do zero ao navegar de um produto

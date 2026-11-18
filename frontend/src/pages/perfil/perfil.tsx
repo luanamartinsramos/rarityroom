@@ -37,6 +37,7 @@ function PerfilPagina() {
   const [perfil, setPerfil] = useState<PerfilApi | null>(null);
   const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
+  const [senhaAtual, setSenhaAtual] = useState("");
   const [enderecos, setEnderecos] = useState<EnderecoApi[]>([]);
   const [novo, setNovo] = useState<EnderecoForm>(ENDERECO_VAZIO);
   const [carregando, setCarregando] = useState(true);
@@ -79,9 +80,10 @@ function PerfilPagina() {
 
   async function salvarEmail() {
     try {
-      const atualizado = await alterarEmail(email);
+      const atualizado = await alterarEmail(email, senhaAtual);
 
       setPerfil(atualizado);
+      setSenhaAtual("");
 
       toast.success("E-mail atualizado.");
     } catch (falha) {
@@ -229,7 +231,18 @@ function PerfilPagina() {
             />
           </label>
 
-          <button className="botao" onClick={salvarEmail}>
+          <label className="campo">
+            Senha atual
+            <input
+              type="password"
+              autoComplete="current-password"
+              placeholder="Confirme para trocar o e-mail"
+              value={senhaAtual}
+              onChange={(evento) => setSenhaAtual(evento.target.value)}
+            />
+          </label>
+
+          <button className="botao" onClick={salvarEmail} disabled={!senhaAtual}>
             Salvar e-mail
           </button>
         </div>

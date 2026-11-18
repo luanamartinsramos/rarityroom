@@ -3,10 +3,11 @@ namespace RarityRoom.Servicos;
 public interface IServicoRecuperacaoSenha
 {
     /// <summary>
-    /// Gera o token de redefinição. Retorna nulo quando o e-mail não existe ou
-    /// a conta está suspensa — o chamador responde de forma genérica.
+    /// Gera o token de redefinição e o entrega pelo canal configurado. Não
+    /// retorna nada de propósito: a resposta da API é sempre a mesma, exista
+    /// ou não o e-mail, e o token nunca volta para quem pediu.
     /// </summary>
-    string? Solicitar(string email);
+    void Solicitar(string email);
 
     void Redefinir(string email, string token, string novaSenha);
 }

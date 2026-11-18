@@ -18,14 +18,25 @@ public class ServicoAdmin : IServicoAdmin
 
     private readonly IRepositorioPedido repositorioPedido;
 
+    private readonly IServicoCategorias servicoCategorias;
+
     public ServicoAdmin(
         IRepositorioUsuario repositorioUsuario,
         IRepositorioProduto repositorioProduto,
-        IRepositorioPedido repositorioPedido)
+        IRepositorioPedido repositorioPedido,
+        IServicoCategorias servicoCategorias)
     {
         this.repositorioUsuario = repositorioUsuario;
         this.repositorioProduto = repositorioProduto;
         this.repositorioPedido = repositorioPedido;
+        this.servicoCategorias = servicoCategorias;
+    }
+
+    public Categoria CriarCategoria(string nome, int solicitanteId)
+    {
+        GarantirAdmin(solicitanteId);
+
+        return servicoCategorias.Criar(nome);
     }
 
     public ResumoAdmin Resumo(int solicitanteId)

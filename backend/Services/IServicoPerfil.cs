@@ -8,7 +8,7 @@ public interface IServicoPerfil
 
     PerfilUsuario AtualizarNome(int usuarioId, string nome);
 
-    PerfilUsuario AtualizarEmail(int usuarioId, string email);
+    PerfilUsuario AtualizarEmail(int usuarioId, string email, string senhaAtual);
 
     PerfilUsuario DefinirFoto(int usuarioId, string fotoUrl);
 }

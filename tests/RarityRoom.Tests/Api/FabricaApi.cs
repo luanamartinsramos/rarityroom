@@ -16,6 +16,18 @@ namespace RarityRoom.Tests.Api;
 /// </summary>
 public class FabricaApi : WebApplicationFactory<Program>
 {
+    /// <summary>Senha do administrador semeado nos testes (via configuração).</summary>
+    public const string SenhaAdmin = "Admin@Teste123";
+
+    /// <summary>Recebe os "e-mails" de recuperação de senha enviados pela API.</summary>
+    public CanalRecuperacaoMemoria CaixaDeEmail { get; } = new();
+
+    /// <summary>
+    /// Limite de autenticação por IP. Todos os clientes de teste compartilham o
+    /// mesmo "IP", então o padrão é alto; os testes do limite o reduzem.
+    /// </summary>
+    public int LimiteAutenticacaoPorMinuto { get; init; } = 100_000;
+
     private readonly string caminhoBanco = Path.Combine(
         Path.GetTempPath(),
         $"rarityroom-teste-{Guid.NewGuid():N}.db");
@@ -31,7 +43,9 @@ public class FabricaApi : WebApplicationFactory<Program>
             configuracao.AddInMemoryCollection(
                 new Dictionary<string, string?>
                 {
-                    ["ConnectionStrings:RarityRoom"] = $"Data Source={caminhoBanco}"
+                    ["ConnectionStrings:RarityRoom"] = $"Data Source={caminhoBanco}",
+                    ["Admin:Senha"] = SenhaAdmin,
+                    ["Seguranca:LimiteAutenticacaoPorMinuto"] = LimiteAutenticacaoPorMinuto.ToString()
                 });
         });
 
@@ -40,6 +54,9 @@ public class FabricaApi : WebApplicationFactory<Program>
             servicos.RemoveAll<IServicoImagens>();
             servicos.AddSingleton<IServicoImagens>(
                 new ServicoImagensArquivo(PastaImagens));
+
+            servicos.RemoveAll<ICanalRecuperacaoSenha>();
+            servicos.AddSingleton<ICanalRecuperacaoSenha>(CaixaDeEmail);
         });
     }
 

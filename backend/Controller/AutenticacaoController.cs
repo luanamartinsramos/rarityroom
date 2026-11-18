@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using System.Security.Claims;
 
 using RarityRoom.Modelos;
@@ -19,36 +20,39 @@ public class AutenticacaoController : ControllerBase
 
     private readonly IServicoRecuperacaoSenha servicoRecuperacaoSenha;
 
+    private readonly ProtecaoForcaBruta protecao;
+
     public AutenticacaoController(
         IServicoAutenticacao servicoAutenticacao,
-        IServicoRecuperacaoSenha servicoRecuperacaoSenha)
+        IServicoRecuperacaoSenha servicoRecuperacaoSenha,
+        ProtecaoForcaBruta protecao)
     {
         this.servicoAutenticacao = servicoAutenticacao;
         this.servicoRecuperacaoSenha = servicoRecuperacaoSenha;
+        this.protecao = protecao;
     }
 
     /// <summary>
-    /// Gera o token de redefinição. Não há provedor de e-mail configurado:
-    /// o token volta na resposta, marcado como demonstração.
+    /// Gera o token de redefinição e o envia ao dono da conta (e-mail simulado
+    /// no log do servidor). A resposta é idêntica exista ou não o e-mail, para
+    /// não revelar quem tem conta, e nunca contém o token.
     /// </summary>
     [HttpPost("recuperar-senha")]
     [AllowAnonymous]
+    [EnableRateLimiting(PoliticasLimite.Autenticacao)]
     public IActionResult RecuperarSenha(ModeloRecuperacao modelo)
     {
-        string? token = servicoRecuperacaoSenha.Solicitar(modelo.Email);
+        servicoRecuperacaoSenha.Solicitar(modelo.Email);
 
         return Ok(new
         {
-            mensagem = token == null
-                ? "Se este e-mail estiver cadastrado, um token foi gerado."
-                : "Token gerado. Use-o para definir a nova senha.",
-            demonstracao = true,
-            token
+            mensagem = "Se este e-mail estiver cadastrado, enviamos as instruções para redefinir a senha."
         });
     }
 
     [HttpPost("redefinir-senha")]
     [AllowAnonymous]
+    [EnableRateLimiting(PoliticasLimite.Autenticacao)]
     public IActionResult RedefinirSenha(ModeloRedefinicao modelo)
     {
         servicoRecuperacaoSenha.Redefinir(
@@ -64,6 +68,7 @@ public class AutenticacaoController : ControllerBase
     /// e-mail duplicado em 409 com código estável.
     /// </summary>
     [HttpPost("cadastrar")]
+    [EnableRateLimiting(PoliticasLimite.Autenticacao)]
     public IActionResult Cadastrar(ModeloCadastro modelo)
     {
         var usuario = servicoAutenticacao.Cadastrar(
@@ -84,9 +89,16 @@ public class AutenticacaoController : ControllerBase
         });
     }
 
+    /// <summary>
+    /// Após 5 senhas erradas seguidas a conta fica bloqueada por 15 minutos
+    /// (429), e cada IP tem um limite de tentativas por minuto.
+    /// </summary>
     [HttpPost("entrar")]
+    [EnableRateLimiting(PoliticasLimite.Autenticacao)]
     public async Task<IActionResult> Entrar(ModeloLogin modelo)
     {
+        protecao.GarantirLiberado(modelo.Email);
+
         var usuario = servicoAutenticacao.Entrar(
             modelo.Email,
             modelo.Senha
@@ -94,46 +106,19 @@ public class AutenticacaoController : ControllerBase
 
         if (usuario == null)
         {
+            protecao.RegistrarFalha(modelo.Email);
+
             return Unauthorized(new
             {
                 mensagem = "E-mail ou senha inválidos."
             });
         }
 
-        var claims = new List<Claim>
-        {
-            new Claim(
-                ClaimTypes.NameIdentifier,
-                usuario.Id.ToString()
-            ),
-
-            new Claim(
-                ClaimTypes.Name,
-                usuario.Nome
-            ),
-
-            new Claim(
-                ClaimTypes.Email,
-                usuario.Email
-            ),
-
-            new Claim("tipoConta", usuario.TipoConta.ToString()),
-
-            new Claim(
-                "administrador",
-                usuario.Administrador ? "true" : "false")
-        };
-
-        var identidade = new ClaimsIdentity(
-            claims,
-            CookieAuthenticationDefaults.AuthenticationScheme
-        );
-
-        var principal = new ClaimsPrincipal(identidade);
+        protecao.RegistrarSucesso(modelo.Email);
 
         await HttpContext.SignInAsync(
             CookieAuthenticationDefaults.AuthenticationScheme,
-            principal
+            SessaoUsuario.CriarPrincipal(usuario)
         );
 
         return Ok(new
@@ -162,7 +147,12 @@ public class AutenticacaoController : ControllerBase
         });
     }
 
+    /// <summary>
+    /// A rota sem acento é a oficial; a com acento fica por compatibilidade
+    /// (alguns clientes HTTP não aceitam caracteres fora do ASCII na URL).
+    /// </summary>
     [Authorize]
+    [HttpGet("usuario-atual")]
     [HttpGet("usuário-atual")]
     public IActionResult UsuarioAtual()
     {
@@ -186,8 +176,4 @@ public class AutenticacaoController : ControllerBase
                 User.FindFirstValue("administrador") == "true"
         });
     }
-
-    /// <summary>
-    /// Vazio assume "Ambos" para não quebrar clientes antigos.
-    /// </summary>
 }

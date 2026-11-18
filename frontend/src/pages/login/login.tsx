@@ -52,7 +52,7 @@ function Login() {
 
     try {
       const response = await fetch(
-        "http://localhost:5000/api/autenticacao/entrar",
+        "/api/autenticacao/entrar",
         {
           method: "POST",
           headers: {
@@ -72,6 +72,17 @@ function Login() {
 
       if (!response.ok) {
         const errorData = data as ErrorResponse | null;
+
+        if (response.status === 429) {
+          // Conta bloqueada por senhas erradas ou limite de tentativas do IP.
+          const bloqueio = data as { detail?: string } | null;
+
+          toast.error(
+            bloqueio?.detail ||
+              "Muitas tentativas. Aguarde alguns minutos e tente novamente.",
+          );
+          return;
+        }
 
         if (response.status === 401) {
           toast.error(

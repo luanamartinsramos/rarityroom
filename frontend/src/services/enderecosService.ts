@@ -22,7 +22,7 @@ export interface EnderecoForm {
   estado: string;
 }
 
-const API = "http://localhost:5000/api/enderecos";
+const API = "/api/enderecos";
 
 export async function obterEnderecos(): Promise<EnderecoApi[]> {
   const resposta = await fetch(API, { credentials: "include" });

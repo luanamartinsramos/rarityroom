@@ -16,7 +16,7 @@ export interface VendedorApi {
   loja?: LojaApi | null;
 }
 
-const API = "http://localhost:5000/api";
+const API = "/api";
 
 export async function obterProduto(id: number): Promise<Produto> {
   const resposta = await fetch(`${API}/produtos/${id}`, {

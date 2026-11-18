@@ -227,11 +227,14 @@ cd tests/RarityRoom.Tests
 dotnet test
 ```
 
-Resultado esperado: **222 testes aprovados, 0 falhas**. A suíte
+Resultado esperado: **241 testes aprovados, 0 falhas**. A suíte
 `Api/MarketplaceApiTests.cs` cobre, pela API HTTP real, pesquisa, as 7
 ordenações, carrinho e limites de estoque, checkout, PIX/boleto/cartão
 simulados, cancelamento, expiração, compras simultâneas do mesmo estoque,
-pedidos duplicados e as regras de segurança.
+pedidos duplicados e as regras de segurança. `Api/SegurancaApiTests.cs`
+reproduz os ataques encontrados no teste de segurança (tomada de conta pela
+recuperação de senha, sessão de conta suspensa, força bruta, upload
+disfarçado etc.) e confirma que não funcionam mais.
 
 Os testes ficam fora de `backend/` porque o SDK Web compila todo `*.cs` da
 pasta do projeto — uma pasta de testes dentro do backend entraria no build da
@@ -244,7 +247,8 @@ aplicação.
 | POST | `/api/autenticacao/cadastrar` | pública |
 | POST | `/api/autenticacao/entrar` | pública |
 | POST | `/api/autenticacao/sair` | cookie |
-| GET | `/api/autenticacao/usuário-atual` | cookie |
+| GET | `/api/autenticacao/usuario-atual` | cookie |
+| POST | `/api/autenticacao/recuperar-senha` \| `/redefinir-senha` | pública (token chega por e-mail simulado) |
 | GET | `/api/produtos?termo=&categoria=&ordem=&pagina=&tamanhoPagina=` | pública (busca; total em `X-Total-Count`) |
 | GET | `/api/produtos/meus` | cookie (anúncios do usuário, qualquer estado) |
 | GET | `/api/produtos/{id}` | pública |
@@ -253,7 +257,7 @@ aplicação.
 | PATCH | `/api/produtos/{id}/estado` | cookie (só o dono) |
 | DELETE | `/api/produtos/{id}` | cookie (só o dono) |
 | GET | `/api/categorias` | pública |
-| POST | `/api/categorias` | cookie |
+| POST | `/api/categorias` | cookie (só administrador) |
 | GET | `/api/favoritos` | cookie |
 | POST/DELETE | `/api/favoritos/{produtoId}` | cookie |
 | GET/POST | `/api/propostas` | cookie |
@@ -326,7 +330,7 @@ dotnet run          # aplica a migração e cria rarityroom.db
 
 - Arquivo gerado: `backend/rarityroom.db` (ignorado pelo git).
 - Tabelas: `usuarios`, `categorias`, `produtos`, `propostas`, `favoritos`, `pedidos`, `avaliacoes`.
-- As 7 categorias iniciais são semeadas de forma idempotente na inicialização.
+- As 15 categorias iniciais são semeadas de forma idempotente na inicialização.
 - Para recomeçar do zero, apague o `rarityroom.db` e rode de novo.
 
 Para usar outro caminho de banco, defina a variável de ambiente:
@@ -342,14 +346,88 @@ curl -b cookies.txt -F "arquivo=@foto.png;type=image/png" \
   http://localhost:5000/api/produtos/1/imagem
 ```
 
-Regras: somente o dono envia; JPG, PNG ou WEBP; até 2 MB. O arquivo é gravado
+Regras: somente o dono envia; JPG, PNG ou WEBP; até 2 MB; o conteúdo precisa
+ter a assinatura binária do formato (um HTML renomeado para `.png` é recusado).
+A permissão é checada antes de gravar, então upload recusado não deixa
+arquivo no disco. O arquivo é gravado
 em `backend/wwwroot/uploads/` com nome gerado pelo servidor e servido em
 `http://localhost:5000/uploads/<nome>`.
 
+# ☁️ Publicação (Render)
+
+Frontend e backend são publicados juntos, num único serviço: o backend
+ASP.NET serve a API em `/api` e o frontend React compilado nas demais rotas.
+Mesma origem = sem CORS e com o cookie de login funcionando em qualquer
+navegador. Em desenvolvimento, o proxy do Vite (`frontend/vite.config.ts`)
+reproduz isso encaminhando `/api` e `/uploads` para `localhost:5000`.
+
+O `Dockerfile` da raiz monta a imagem (Node compila o frontend, .NET publica
+o backend) e o `render.yaml` descreve o serviço.
+
+1. Crie uma conta em <https://render.com> (dá para entrar com o GitHub).
+2. No painel: **New +** → **Blueprint** → escolha este repositório.
+3. Quando pedir `Admin__Senha`, digite a senha do administrador
+   (mínimo 8 caracteres, com letra e número).
+4. Clique em **Apply**. O primeiro build leva alguns minutos; depois o site
+   fica em `https://rarityroom.onrender.com` (ou nome parecido).
+
+A cada `git push` na `main` o Render publica de novo sozinho.
+
+**Plano gratuito:** o serviço "dorme" após 15 minutos sem acesso (a primeira
+visita depois disso demora cerca de 1 minuto) e **o banco e as imagens são
+apagados a cada reinício ou deploy**. Para manter os dados, adicione um disco
+persistente ao serviço (plano pago) montado em `/data` — o app já guarda
+banco, imagens e chaves de sessão nessa pasta (`Armazenamento__Pasta`).
+
+Para testar a imagem localmente:
+
+```bash
+docker build -t rarityroom .
+docker run -p 8080:8080 -e Admin__Senha=SuaSenha123 rarityroom
+# abra http://localhost:8080
+```
+
+# 🔐 Segurança e conta de administrador
+
+**Administrador.** A senha não fica no código. Ela vem da configuração
+`Admin:Senha` (variável de ambiente `Admin__Senha`; o e-mail padrão é
+`admin@rarityroom.com`, alterável por `Admin__Email`):
+
+```bash
+cd backend
+Admin__Senha="UmaSenhaForte123" dotnet run
+```
+
+Sem `Admin__Senha`, em desenvolvimento é gerada uma senha aleatória, mostrada
+**uma única vez** no terminal (linha `Conta de administrador: ... senha
+gerada: ...`). Fora de desenvolvimento nenhum admin é criado. Um banco antigo
+com a senha pública `admin123` tem essa senha trocada na inicialização.
+
+**Recuperação de senha.** O código de redefinição nunca volta na resposta da
+API: ele é enviado por um "e-mail simulado", que aparece no terminal do
+backend como `[E-MAIL SIMULADO] Para: ... token de redefinição de senha: ...`.
+A resposta é a mesma exista ou não o e-mail (não revela quem tem conta).
+
+**Outras proteções**
+
+- Senha com no mínimo 8 caracteres, ao menos uma letra e um número.
+- 5 senhas erradas seguidas bloqueiam a conta por 15 minutos (HTTP 429), e
+  cada IP tem limite de 20 tentativas de autenticação por minuto
+  (`Seguranca__LimiteAutenticacaoPorMinuto`).
+- A sessão é revalidada a cada requisição: conta suspensa ou senha
+  redefinida derruba as sessões abertas na hora.
+- Trocar o e-mail exige a senha atual.
+- Só administradores criam categorias.
+- Estoque limitado a 100.000 unidades por anúncio.
+- Respostas com `X-Content-Type-Options: nosniff`; Swagger só em
+  desenvolvimento (`dotnet run` usa o perfil de `Properties/launchSettings.json`).
+
 # ⚠️ Limitações conhecidas
 
-- Busca e filtro são feitos no frontend; não há paginação na API.
-- Upload valida tamanho e tipo declarado, mas não inspeciona o conteúdo binário.
 - Pagamento e envio ficam fora do escopo: o pedido termina na conclusão pelo
   vendedor.
+- O bloqueio de força bruta e o limite por IP ficam em memória: reiniciar o
+  servidor zera os contadores, e com vários servidores cada um conta à parte.
+- Não há envio real de e-mail; troque `CanalRecuperacaoSenhaLog` por uma
+  implementação de verdade antes de publicar.
 - Não há teste contra PostgreSQL ou SQL Server.

@@ -8,9 +8,12 @@ public class ServicoPerfil : IServicoPerfil
 {
     private readonly IRepositorioUsuario repositorioUsuario;
 
-    public ServicoPerfil(IRepositorioUsuario repositorioUsuario)
+    private readonly IHashSenha hashSenha;
+
+    public ServicoPerfil(IRepositorioUsuario repositorioUsuario, IHashSenha hashSenha)
     {
         this.repositorioUsuario = repositorioUsuario;
+        this.hashSenha = hashSenha;
     }
 
     public PerfilUsuario Obter(int usuarioId)
@@ -29,11 +32,24 @@ public class ServicoPerfil : IServicoPerfil
         return ParaPerfil(usuario);
     }
 
-    public PerfilUsuario AtualizarEmail(int usuarioId, string email)
+    /// <summary>
+    /// O e-mail é o login e o destino da recuperação de senha: trocá-lo exige
+    /// a senha atual, senão uma sessão aberta num computador emprestado
+    /// bastaria para tomar a conta.
+    /// </summary>
+    public PerfilUsuario AtualizarEmail(int usuarioId, string email, string senhaAtual)
     {
         var usuario = ObterUsuario(usuarioId);
 
-        var existente = repositorioUsuario.ObterPorEmail(email ?? string.Empty);
+        if (string.IsNullOrEmpty(senhaAtual)
+            || !hashSenha.VerificarSenha(senhaAtual, usuario.SenhaHash))
+        {
+            throw new ValidacaoException("Senha atual incorreta.");
+        }
+
+        email ??= string.Empty;
+
+        var existente = repositorioUsuario.ObterPorEmail(email);
 
         if (existente != null && existente.Id != usuarioId)
         {

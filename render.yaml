@@ -1,0 +1,15 @@
+# Blueprint do Render: no painel, "New +" → "Blueprint" → escolha este
+# repositório. Um único serviço serve a API e o frontend.
+services:
+  - type: web
+    name: rarityroom
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/categorias
+    autoDeploy: true
+    envVars:
+      # Senha do administrador (admin@rarityroom.com). O Render pede o valor
+      # ao criar o serviço: mínimo 8 caracteres, com letra e número.
+      - key: Admin__Senha
+        sync: false

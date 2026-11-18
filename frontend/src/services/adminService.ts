@@ -20,7 +20,7 @@ export interface UsuarioAdmin {
   criadoEm: string;
 }
 
-const API = "http://localhost:5000/api/admin";
+const API = "/api/admin";
 
 async function pedir<T>(caminho: string, init?: RequestInit): Promise<T> {
   const resposta = await fetch(`${API}${caminho}`, {

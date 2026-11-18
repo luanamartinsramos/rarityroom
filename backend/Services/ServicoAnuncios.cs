@@ -458,6 +458,11 @@ public class ServicoAnuncios : IServicoAnuncios
         return produto;
     }
 
+    public void GarantirDono(int id, int solicitanteId)
+    {
+        ObterPorId(id).ValidarPropriedade(solicitanteId);
+    }
+
     public Produto DefinirImagem(int id, string imagemUrl, int solicitanteId)
     {
         var produto = ObterPorId(id);

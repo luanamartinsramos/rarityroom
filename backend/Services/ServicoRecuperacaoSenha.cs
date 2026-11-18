@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using RarityRoom.Modelos;
 using RarityRoom.Modelos.Excecoes;
 using RarityRoom.Repositorios;
@@ -5,8 +6,10 @@ using RarityRoom.Repositorios;
 namespace RarityRoom.Servicos;
 
 /// <summary>
-/// Redefinição de senha sem provedor de e-mail. O token é devolvido na própria
-/// resposta e marcado como demonstração — em produção ele iria por e-mail.
+/// Redefinição de senha. O token é entregue pelo <see cref="ICanalRecuperacaoSenha"/>
+/// (no projeto, um e-mail simulado no log do servidor) e nunca volta na
+/// resposta HTTP — senão qualquer pessoa que soubesse o e-mail de alguém
+/// conseguiria trocar a senha dessa conta.
 /// </summary>
 public class ServicoRecuperacaoSenha : IServicoRecuperacaoSenha
 {
@@ -18,35 +21,40 @@ public class ServicoRecuperacaoSenha : IServicoRecuperacaoSenha
 
     private readonly IHashSenha hash;
 
+    private readonly ICanalRecuperacaoSenha canal;
+
     public ServicoRecuperacaoSenha(
         IRepositorioUsuario repositorioUsuario,
         IRepositorioRecuperacaoSenha repositorioRecuperacao,
-        IHashSenha hash)
+        IHashSenha hash,
+        ICanalRecuperacaoSenha canal)
     {
         this.repositorioUsuario = repositorioUsuario;
         this.repositorioRecuperacao = repositorioRecuperacao;
         this.hash = hash;
+        this.canal = canal;
     }
 
-    public string? Solicitar(string email)
+    public void Solicitar(string email)
     {
         var usuario = repositorioUsuario.ObterPorEmail(email ?? string.Empty);
 
         if (usuario == null || !usuario.Ativo)
         {
-            return null;
+            return;
         }
 
         repositorioRecuperacao.InvalidarDoUsuario(usuario.Id);
 
-        string token = Guid.NewGuid().ToString("N");
+        // 256 bits de um gerador criptográfico: impossível de adivinhar.
+        string token = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();
 
         repositorioRecuperacao.Adicionar(new RecuperacaoSenha(
             usuario.Id,
             token,
             DateTime.UtcNow.Add(Validade)));
 
-        return token;
+        canal.Enviar(usuario.Email, usuario.Nome, token);
     }
 
     public void Redefinir(string email, string token, string novaSenha)

@@ -141,6 +141,9 @@ public class ProdutosController : ControllerBase
             throw new ValidacaoException("Envie um arquivo de imagem.");
         }
 
+        // Permissão antes de tocar no disco: upload recusado não deixa arquivo.
+        servicoAnuncios.GarantirDono(id, User.ObterUsuarioId());
+
         await using Stream conteudo = arquivo.OpenReadStream();
 
         string caminho = await servicoImagens.SalvarAsync(

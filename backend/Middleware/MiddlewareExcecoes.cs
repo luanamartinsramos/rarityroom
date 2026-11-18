@@ -84,6 +84,7 @@ public class MiddlewareExcecoes
     {
         return excecao switch
         {
+            MuitasTentativasException => StatusCodes.Status429TooManyRequests,
             AcessoNegadoException => StatusCodes.Status403Forbidden,
             NaoEncontradoException => StatusCodes.Status404NotFound,
             TransicaoInvalidaException => StatusCodes.Status409Conflict,

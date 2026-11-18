@@ -11,9 +11,14 @@ public class CategoriasController : ControllerBase
 {
     private readonly IServicoCategorias servicoCategorias;
 
-    public CategoriasController(IServicoCategorias servicoCategorias)
+    private readonly IServicoAdmin servicoAdmin;
+
+    public CategoriasController(
+        IServicoCategorias servicoCategorias,
+        IServicoAdmin servicoAdmin)
     {
         this.servicoCategorias = servicoCategorias;
+        this.servicoAdmin = servicoAdmin;
     }
 
     [HttpGet]
@@ -26,7 +31,10 @@ public class CategoriasController : ControllerBase
     [Authorize]
     public IActionResult Criar(ModeloCategoria modelo)
     {
-        var categoria = servicoCategorias.Criar(modelo.Nome);
+        // Catálogo global: só administradores criam categorias (403 para os demais).
+        var categoria = servicoAdmin.CriarCategoria(
+            modelo.Nome,
+            User.ObterUsuarioId());
 
         return StatusCode(
             StatusCodes.Status201Created,

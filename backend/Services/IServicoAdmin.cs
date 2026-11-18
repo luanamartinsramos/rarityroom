@@ -18,4 +18,7 @@ public interface IServicoAdmin
     Produto ModerarAnuncio(int id, string acao, int solicitanteId);
 
     List<Pedido> ListarPedidos(int solicitanteId);
+
+    /// <summary>O catálogo de categorias é global: só administradores o alteram.</summary>
+    Categoria CriarCategoria(string nome, int solicitanteId);
 }

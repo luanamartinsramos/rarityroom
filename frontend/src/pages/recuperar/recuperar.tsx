@@ -12,20 +12,14 @@ function RecuperarPagina() {
   const [email, setEmail] = useState("");
   const [token, setToken] = useState("");
   const [novaSenha, setNovaSenha] = useState("");
-  const [tokenGerado, setTokenGerado] = useState<string | null>(null);
+  const [enviado, setEnviado] = useState(false);
 
   async function solicitar() {
     try {
-      const gerado = await solicitarRecuperacao(email);
+      const mensagem = await solicitarRecuperacao(email);
 
-      if (gerado) {
-        setToken(gerado);
-        setTokenGerado(gerado);
-        toast.success("Token gerado.");
-      } else {
-        setTokenGerado(null);
-        toast("Se este e-mail existir, um token foi gerado.", { icon: "ℹ️" });
-      }
+      setEnviado(true);
+      toast.success(mensagem);
     } catch (falha) {
       toast.error(
         falha instanceof Error ? falha.message : "Falha ao solicitar.",
@@ -35,10 +29,9 @@ function RecuperarPagina() {
 
   async function redefinir() {
     try {
-      await redefinirSenha(email, token, novaSenha);
+      await redefinirSenha(email, token.trim(), novaSenha);
 
       toast.success("Senha redefinida. Entre com a nova senha.");
-
       navigate("/login");
     } catch (falha) {
       toast.error(
@@ -55,86 +48,77 @@ function RecuperarPagina() {
         <h1>Recuperar senha</h1>
       </div>
 
-      <div className="avaliacoes" style={{ maxWidth: 520 }}>
-        <div className="notificacao">
-          <div style={{ width: "100%" }}>
-            <strong>1. Informe seu e-mail</strong>
+      <form
+        className="form-cartao"
+        style={{ maxWidth: 560 }}
+        onSubmit={(evento) => {
+          evento.preventDefault();
+          void solicitar();
+        }}
+      >
+        <strong>1. Informe seu e-mail</strong>
 
-            <p>
-              Sem provedor de e-mail configurado, o token aparece na tela —
-              este fluxo é demonstrativo.
-            </p>
+        <p style={{ color: "#c7bdda", margin: "8px 0 16px", lineHeight: 1.5 }}>
+          Enviaremos um código para redefinir a senha. Este projeto não tem
+          servidor de e-mail: o “e-mail” é simulado e o código aparece no
+          terminal onde o backend está rodando (linha <code>[E-MAIL SIMULADO]</code>).
+        </p>
 
+        <div className="campo-linha">
+          <label className="campo">
+            E-mail
             <input
+              type="email"
               placeholder="seu@email.com"
               value={email}
               onChange={(evento) => setEmail(evento.target.value)}
-              style={{
-                width: "100%",
-                padding: 10,
-                marginTop: 10,
-                borderRadius: 8,
-                border: "1px solid rgba(255,255,255,.15)",
-                background: "rgba(255,255,255,.04)",
-                color: "inherit",
-              }}
             />
+          </label>
 
-            <button style={{ marginTop: 10 }} onClick={solicitar}>
-              Gerar token
-            </button>
-
-            {tokenGerado && (
-              <p style={{ marginTop: 12, wordBreak: "break-all" }}>
-                <small>Token de demonstração:</small>
-                <br />
-                <code>{tokenGerado}</code>
-              </p>
-            )}
-          </div>
+          <button type="submit" className="botao" disabled={!email}>
+            Enviar código
+          </button>
         </div>
+      </form>
 
-        <div className="notificacao">
-          <div style={{ width: "100%" }}>
-            <strong>2. Defina a nova senha</strong>
+      <form
+        className="form-cartao"
+        style={{ maxWidth: 560, opacity: enviado ? 1 : 0.6 }}
+        onSubmit={(evento) => {
+          evento.preventDefault();
+          void redefinir();
+        }}
+      >
+        <strong>2. Defina a nova senha</strong>
 
+        <div className="grade-form" style={{ marginTop: 16 }}>
+          <label className="campo col-cheia">
+            Código recebido
             <input
-              placeholder="Token recebido"
+              placeholder="Cole o código do e-mail"
               value={token}
               onChange={(evento) => setToken(evento.target.value)}
-              style={{
-                width: "100%",
-                padding: 10,
-                marginTop: 10,
-                borderRadius: 8,
-                border: "1px solid rgba(255,255,255,.15)",
-                background: "rgba(255,255,255,.04)",
-                color: "inherit",
-              }}
             />
+          </label>
 
+          <label className="campo col-cheia">
+            Nova senha
             <input
               type="password"
-              placeholder="Nova senha (mínimo 6)"
+              autoComplete="new-password"
+              placeholder="Mínimo 8 caracteres, com letra e número"
               value={novaSenha}
               onChange={(evento) => setNovaSenha(evento.target.value)}
-              style={{
-                width: "100%",
-                padding: 10,
-                marginTop: 10,
-                borderRadius: 8,
-                border: "1px solid rgba(255,255,255,.15)",
-                background: "rgba(255,255,255,.04)",
-                color: "inherit",
-              }}
             />
-
-            <button style={{ marginTop: 10 }} onClick={redefinir}>
-              Redefinir senha
-            </button>
-          </div>
+          </label>
         </div>
-      </div>
+
+        <div className="form-rodape">
+          <button type="submit" className="botao-primario" disabled={!email || !token || !novaSenha}>
+            Redefinir senha
+          </button>
+        </div>
+      </form>
     </main>
   );
 }

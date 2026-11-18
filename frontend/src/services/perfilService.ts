@@ -8,7 +8,7 @@ export interface PerfilApi {
   desde: string;
 }
 
-const API = "http://localhost:5000/api/perfil";
+const API = "/api/perfil";
 
 export async function obterPerfil(): Promise<PerfilApi> {
   const resposta = await fetch(API, { credentials: "include" });
@@ -37,12 +37,16 @@ export async function alterarNome(nome: string): Promise<PerfilApi> {
   return resposta.json();
 }
 
-export async function alterarEmail(email: string): Promise<PerfilApi> {
+/** Trocar o e-mail (login) exige a senha atual. */
+export async function alterarEmail(
+  email: string,
+  senhaAtual: string,
+): Promise<PerfilApi> {
   const resposta = await fetch(`${API}/email`, {
     method: "PUT",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email }),
+    body: JSON.stringify({ email, senhaAtual }),
   });
 
   if (!resposta.ok) {

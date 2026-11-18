@@ -19,6 +19,12 @@ public class Produto
     private const decimal PrecoMaximo = 1_000_000m;
 
     /// <summary>
+    /// Teto de unidades por anúncio. Além de ser um limite realista, impede
+    /// que somas de estoque (reposição por cancelamento) estourem o int.
+    /// </summary>
+    public const int EstoqueMaximo = 100_000;
+
+    /// <summary>
     /// Tabela única de transições, indexada por (estado de origem, operação).
     /// Indexar apenas pelo destino faria "Reativar" e "CancelarReserva"
     /// colidirem, permitindo a operação errada no estado errado.
@@ -323,7 +329,8 @@ public class Produto
             throw new ValidacaoException("A quantidade deve ser maior que zero.");
         }
 
-        Estoque += quantidade;
+        // Soma em long e limita ao teto: nunca estoura nem fica negativo.
+        Estoque = (int)Math.Min((long)Estoque + quantidade, EstoqueMaximo);
 
         if (Estado == EstadoAnuncio.Vendido)
         {
@@ -450,6 +457,12 @@ public class Produto
         if (estoque < 0)
         {
             throw new ValidacaoException("O estoque não pode ser negativo.");
+        }
+
+        if (estoque > EstoqueMaximo)
+        {
+            throw new ValidacaoException(
+                "O estoque deve ser de no máximo 100.000 unidades.");
         }
 
         return estoque;

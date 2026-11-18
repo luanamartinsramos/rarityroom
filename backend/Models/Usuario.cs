@@ -12,7 +12,9 @@ public class Usuario
     private const int TamanhoMinimoNome = 3;
     private const int TamanhoMaximoNome = 120;
     private const int TamanhoMaximoEmail = 200;
-    private const int TamanhoMinimoSenha = 6;
+    private const int TamanhoMinimoSenha = 8;
+
+    private const int TamanhoMaximoSenha = 128;
 
     public int Id { get; private set; }
 
@@ -153,6 +155,20 @@ public class Usuario
         {
             throw new ValidacaoException(
                 $"A senha deve ter pelo menos {TamanhoMinimoSenha} caracteres.");
+        }
+
+        if (texto.Length > TamanhoMaximoSenha)
+        {
+            throw new ValidacaoException(
+                $"A senha deve ter no máximo {TamanhoMaximoSenha} caracteres.");
+        }
+
+        // Senhas só de números ("12345678") ou só de letras são as primeiras
+        // testadas em ataques de dicionário.
+        if (!texto.Any(char.IsLetter) || !texto.Any(char.IsDigit))
+        {
+            throw new ValidacaoException(
+                "A senha deve ter pelo menos uma letra e um número.");
         }
     }
 

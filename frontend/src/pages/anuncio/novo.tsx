@@ -88,7 +88,7 @@ function NovoAnuncioPagina() {
     setEnviando(true);
 
     try {
-      const resposta = await fetch("http://localhost:5000/api/produtos", {
+      const resposta = await fetch("/api/produtos", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },

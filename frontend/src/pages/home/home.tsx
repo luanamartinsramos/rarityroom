@@ -204,7 +204,7 @@ function Home() {
     async function loadUser() {
       try {
         const response = await fetch(
-          "http://localhost:5000/api/autenticacao/usuário-atual",
+          "/api/autenticacao/usuario-atual",
           {
             method: "GET",
             credentials: "include",
@@ -255,7 +255,7 @@ function Home() {
   async function handleLogout() {
     try {
       const response = await fetch(
-        "http://localhost:5000/api/autenticacao/sair",
+        "/api/autenticacao/sair",
         {
           method: "POST",
           credentials: "include",
@@ -359,8 +359,8 @@ function Home() {
       };
 
       const url = editingProduct
-        ? `http://localhost:5000/api/Produtos/${editingProduct.id}`
-        : "http://localhost:5000/api/Produtos";
+        ? `/api/Produtos/${editingProduct.id}`
+        : "/api/Produtos";
 
       const response = await fetch(url, {
         method: editingProduct ? "PUT" : "POST",
@@ -408,7 +408,7 @@ function Home() {
 
     try {
       const response = await fetch(
-        `http://localhost:5000/api/Produtos/${productId}`,
+        `/api/Produtos/${productId}`,
         {
           method: "DELETE",
           credentials: "include",

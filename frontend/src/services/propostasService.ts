@@ -8,7 +8,7 @@ export interface PropostaApi {
   criadaEm: string;
 }
 
-const API = "http://localhost:5000/api/propostas";
+const API = "/api/propostas";
 
 export async function obterPropostas(): Promise<PropostaApi[]> {
   const resposta = await fetch(API, {

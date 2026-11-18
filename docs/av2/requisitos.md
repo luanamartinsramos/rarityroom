@@ -24,14 +24,14 @@ paginação e busca no servidor.
 | RF01 | Cadastrar usuário com nome, e-mail e senha | `ServicoAutenticacao.Cadastrar`; `ServicoAutenticacaoTests` |
 | RF02 | Autenticar por e-mail e senha, mantendo sessão por cookie | `AutenticacaoController.Entrar`; cookie `RarityRoom.Auth` |
 | RF03 | Encerrar sessão | `AutenticacaoController.Sair` |
-| RF04 | Consultar o usuário autenticado | `GET /api/autenticacao/usuário-atual` |
+| RF04 | Consultar o usuário autenticado | `GET /api/autenticacao/usuario-atual` (a rota com acento segue aceita por compatibilidade) |
 | RF05 | Listar o catálogo de anúncios sem exigir login | `GET /api/produtos`; verificado HTTP 200 anônimo |
 | RF06 | Consultar um anúncio por identificador | `GET /api/produtos/{id}` |
 | RF07 | Publicar anúncio vinculado ao autor | `POST /api/produtos`; `Produto.UsuarioId` |
 | RF08 | Editar anúncio | `PUT /api/produtos/{id}`; `ServicoAnuncios.Atualizar` |
 | RF09 | Excluir anúncio | `DELETE /api/produtos/{id}`; `ServicoAnuncios.Remover` |
 | RF10 | Alterar o estado do anúncio | `PATCH /api/produtos/{id}/estado` |
-| RF11 | Listar e cadastrar categorias | `CategoriasController`; 7 categorias semeadas |
+| RF11 | Listar e cadastrar categorias | `CategoriasController`; 15 categorias semeadas; cadastro restrito a administradores |
 | RF12 | Favoritar e desfavoritar anúncio | `FavoritosController` |
 | RF13 | Listar os próprios favoritos | `GET /api/favoritos` |
 | RF14 | Enviar proposta de compra | `POST /api/propostas` |

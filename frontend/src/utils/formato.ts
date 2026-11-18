@@ -34,15 +34,12 @@ export function estrelas(media: number): string {
 
 /**
  * Imagens enviadas por upload ficam no backend como "/uploads/arquivo.png".
- * O frontend roda em outra porta, então o caminho relativo precisa apontar
- * para o servidor da API. URLs absolutas (http/https) passam direto.
+ * Frontend e API são servidos pela mesma origem (em desenvolvimento, pelo
+ * proxy do Vite), então o caminho relativo funciona como está. URLs
+ * absolutas (http/https) passam direto.
  */
 export function urlImagem(url: string | null | undefined): string | undefined {
-  if (!url) {
-    return undefined;
-  }
-
-  return url.startsWith("/uploads/") ? `http://localhost:5000${url}` : url;
+  return url || undefined;
 }
 
 const ROTULOS: Record<string, string> = {

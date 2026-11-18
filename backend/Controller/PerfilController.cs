@@ -42,7 +42,8 @@ public class PerfilController : ControllerBase
     {
         return Ok(servicoPerfil.AtualizarEmail(
             User.ObterUsuarioId(),
-            modelo.Email));
+            modelo.Email,
+            modelo.SenhaAtual));
     }
 
     /// <summary>Foto de perfil: mesmo serviço de imagens dos anúncios.</summary>

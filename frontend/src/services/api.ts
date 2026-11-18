@@ -1,4 +1,4 @@
-export const API_BASE = "http://localhost:5000/api";
+export const API_BASE = "/api";
 
 /** Erro da API com a mensagem de negócio enviada pelo servidor. */
 export class ErroApi extends Error {

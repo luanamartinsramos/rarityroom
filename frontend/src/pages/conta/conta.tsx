@@ -60,7 +60,7 @@ function ContaPagina() {
     try {
       const [dadosConta, listaPedidos, listaFavoritos, listaPropostas] =
         await Promise.all([
-          fetch("http://localhost:5000/api/autenticacao/usuário-atual", {
+          fetch("/api/autenticacao/usuario-atual", {
             credentials: "include",
           }).then((resposta) => (resposta.ok ? resposta.json() : null)),
           obterPedidos().catch(() => []),

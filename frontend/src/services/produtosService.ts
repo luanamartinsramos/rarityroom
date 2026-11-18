@@ -61,8 +61,8 @@ export const ORDENS = [
   { valor: "MelhorAvaliados", rotulo: "Melhor avaliados" },
 ];
 
-const API_PRODUTOS = "http://localhost:5000/api/produtos";
-const API_CATEGORIAS = "http://localhost:5000/api/categorias";
+const API_PRODUTOS = "/api/produtos";
+const API_CATEGORIAS = "/api/categorias";
 
 /**
  * A pesquisa acontece no servidor: o termo é comparado sem diferenciar acento

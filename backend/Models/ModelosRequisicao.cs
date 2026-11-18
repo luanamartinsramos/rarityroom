@@ -164,6 +164,10 @@ public class ModeloEmail
 {
     [Required]
     public string Email { get; set; } = string.Empty;
+
+    /// <summary>Confirmação de identidade para trocar o e-mail de login.</summary>
+    [Required]
+    public string SenhaAtual { get; set; } = string.Empty;
 }
 
 public class ModeloEndereco

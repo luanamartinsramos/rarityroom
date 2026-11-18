@@ -61,6 +61,21 @@ public class UsuarioTests
         Assert.Throws<ValidacaoException>(() => Usuario.ValidarSenha("123"));
     }
 
+    [Theory]
+    [InlineData("12345678")]
+    [InlineData("abcdefgh")]
+    [InlineData("senha12")]
+    public void ValidarSenha_FracaDeveFalhar(string senha)
+    {
+        Assert.Throws<ValidacaoException>(() => Usuario.ValidarSenha(senha));
+    }
+
+    [Fact]
+    public void ValidarSenha_LongaDemaisDeveFalhar()
+    {
+        Assert.Throws<ValidacaoException>(() => Usuario.ValidarSenha("a1" + new string('x', 200)));
+    }
+
     [Fact]
     public void ValidarSenha_ValidaNaoDeveFalhar()
     {
