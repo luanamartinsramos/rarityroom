@@ -29,6 +29,8 @@ function NotificacoesPagina() {
   }
 
   useEffect(() => {
+    // carregar() só altera estado depois do await, então não há render em cascata.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void carregar();
   }, []);
 

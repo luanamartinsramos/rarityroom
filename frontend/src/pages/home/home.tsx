@@ -51,14 +51,27 @@ interface ProdutoForm {
   imagemUrl: string;
 }
 
-// Paleta visual aplicada às categorias vindas do catálogo do backend.
-const paletaCategorias = [
-  { descricao: "Jogos e acessórios", icon: "🎮", classe: "category-purple" },
-  { descricao: "Heróis e quadrinhos", icon: "🦸", classe: "category-gold" },
-  { descricao: "Itens colecionáveis", icon: "✨", classe: "category-blue" },
-  { descricao: "Animes e mangás", icon: "👾", classe: "category-red" },
-  { descricao: "Bonecos e estátuas", icon: "🧸", classe: "category-pink" },
-];
+// Visual de cada categoria do catálogo, indexado pelo slug do backend.
+// Categorias novas (criadas depois) caem no visual padrão.
+const visualCategorias: Record<string, { descricao: string; icon: string; classe: string }> = {
+  "acessorios-geek": { descricao: "Canecas, chaveiros e mais", icon: "🎒", classe: "category-purple" },
+  "action-figures": { descricao: "Bonecos articulados", icon: "🦸", classe: "category-gold" },
+  animes: { descricao: "Produtos de anime", icon: "🍥", classe: "category-pink" },
+  "cartas-colecionaveis": { descricao: "TCG e cartas raras", icon: "🃏", classe: "category-blue" },
+  "colecionaveis-raros": { descricao: "Peças exclusivas", icon: "💎", classe: "category-gold" },
+  "filmes-e-series": { descricao: "Itens de cinema e TV", icon: "🎬", classe: "category-red" },
+  "funko-pop": { descricao: "Bonecos Funko", icon: "🧸", classe: "category-pink" },
+  "hqs-e-quadrinhos": { descricao: "Revistas e graphic novels", icon: "📚", classe: "category-blue" },
+  "jogos-e-consoles": { descricao: "Games e consoles retrô", icon: "🎮", classe: "category-purple" },
+  lego: { descricao: "Sets e minifiguras", icon: "🧱", classe: "category-red" },
+  "magic-the-gathering": { descricao: "Cartas de Magic", icon: "🔮", classe: "category-purple" },
+  mangas: { descricao: "Volumes e coleções", icon: "📖", classe: "category-pink" },
+  outros: { descricao: "Outros colecionáveis", icon: "✨", classe: "category-blue" },
+  pokemon: { descricao: "Cartas e pelúcias", icon: "⚡", classe: "category-gold" },
+  "yu-gi-oh": { descricao: "Cartas de Yu-Gi-Oh!", icon: "🐉", classe: "category-red" },
+};
+
+const visualPadrao = { descricao: "Itens colecionáveis", icon: "✨", classe: "category-blue" };
 
 const emptyForm: ProdutoForm = {
   nome: "",
@@ -104,7 +117,8 @@ function Home() {
 
   const [searchResults, setSearchResults] = useState<Produto[]>([]);
   const [totalResultados, setTotalResultados] = useState(0);
-  const [searching, setSearching] = useState(false);
+  // Chave da última pesquisa concluída; "pesquisando" é derivado dela.
+  const [buscaConcluida, setBuscaConcluida] = useState("");
   const [recarga, setRecarga] = useState(0);
 
   const [favoriteProducts, setFavoriteProducts] = useState<Produto[]>([]);
@@ -438,10 +452,11 @@ function Home() {
   }, [search, precoMin, precoMax]);
 
   // Pesquisa no servidor sempre que um critério da URL muda.
+  const chaveBusca = JSON.stringify([termoUrl, selectedCategory, ordem, pagina, precoMinUrl, precoMaxUrl, somenteDestaque, recarga]);
+  const searching = buscaConcluida !== chaveBusca;
+
   useEffect(() => {
     let cancelado = false;
-
-    setSearching(true);
 
     const filtro: FiltroProdutos = {
       termo: termoUrl,
@@ -470,7 +485,7 @@ function Home() {
       .catch(() => !cancelado && toast.error("Não foi possível pesquisar."))
       .finally(() => {
         if (!cancelado) {
-          setSearching(false);
+          setBuscaConcluida(chaveBusca);
           setLoadingProducts(false);
         }
       });
@@ -478,16 +493,18 @@ function Home() {
     return () => {
       cancelado = true;
     };
-  }, [termoUrl, selectedCategory, ordem, pagina, precoMinUrl, precoMaxUrl, somenteDestaque, recarga]);
+    // chaveBusca resume exatamente estas dependências.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chaveBusca]);
 
   // Categorias vêm do catálogo do backend, não de uma lista fixa.
   useEffect(() => {
     obterCategorias()
       .then((lista) =>
         setCategorias(
-          lista.map((categoria, indice) => ({
+          lista.map((categoria) => ({
             nome: categoria.nome,
-            ...paletaCategorias[indice % paletaCategorias.length],
+            ...(visualCategorias[categoria.slug] ?? visualPadrao),
           })),
         ),
       )
@@ -497,7 +514,6 @@ function Home() {
   // Contador de notificações não lidas no cabeçalho.
   useEffect(() => {
     if (!user) {
-      setNaoLidas(0);
       return;
     }
 
@@ -509,7 +525,6 @@ function Home() {
   // Pedidos vêm do servidor: conta nova não tem nenhum.
   useEffect(() => {
     if (!user) {
-      setOrders([]);
       return;
     }
 
@@ -921,7 +936,7 @@ function Home() {
           </div>
 
           {!searching && (
-            <p style={{ color: "#9b8fb0", margin: "0 0 12px" }}>
+            <p className="products-resumo">
               {totalResultados} {totalResultados === 1 ? "produto encontrado" : "produtos encontrados"}
               {" · ordenado por "}
               {ORDENS.find((opcao) => opcao.valor === ordem)?.rotulo ?? "Relevância"}
@@ -985,7 +1000,7 @@ function Home() {
                     {product.imagemUrl ? (
                       <img src={urlImagem(product.imagemUrl)} alt={product.nome} />
                     ) : (
-                      <span style={{ fontSize: 48, color: "#3a2c50", display: "grid", placeItems: "center", height: "100%" }}>◇</span>
+                      <span className="product-cover-vazio">◇</span>
                     )}
 
                     <button
@@ -1004,11 +1019,11 @@ function Home() {
                   <div className="product-info">
                     <span>{product.categoria}</span>
 
-                    <h3>{product.nome}</h3>
+                    <h3 title={product.nome}>{product.nome}</h3>
 
                     <strong>{moeda(product.preco)}</strong>
 
-                    <small style={{ color: "#9b8fb0", display: "block", marginTop: 4 }}>
+                    <small className="product-meta">
                       {product.vendedorNome ? `por ${product.vendedorNome} · ` : ""}
                       {(product.totalAvaliacoes ?? 0) > 0
                         ? `${estrelas(product.mediaAvaliacoes ?? 0)} (${product.totalAvaliacoes})`
@@ -1016,7 +1031,7 @@ function Home() {
                       {(product.vendas ?? 0) > 0 && ` · ${product.vendas} vendido(s)`}
                     </small>
 
-                    <small style={{ color: product.estoque <= 2 ? "#f1d58a" : "#9b8fb0", display: "block" }}>
+                    <small className={`product-estoque ${product.estoque <= 2 ? "baixo" : ""}`}>
                       {product.estoque === 1 ? "Última unidade!" : `${product.estoque} em estoque`}
                     </small>
 
@@ -1115,7 +1130,7 @@ function Home() {
                       <strong>{produto.nome}</strong>
 
                       <span>
-                        R$ {produto.preco.toFixed(2).replace(".", ",")} ·{" "}
+                        {moeda(produto.preco)} ·{" "}
                         {produto.estado}
                       </span>
 
@@ -1177,7 +1192,7 @@ function Home() {
                     {product.imagemUrl ? (
                       <img src={urlImagem(product.imagemUrl)} alt={product.nome} />
                     ) : (
-                      <span style={{ fontSize: 48, color: "#3a2c50", display: "grid", placeItems: "center", height: "100%" }}>◇</span>
+                      <span className="product-cover-vazio">◇</span>
                     )}
 
                     <div>
@@ -1185,7 +1200,7 @@ function Home() {
                       <strong>{product.nome}</strong>
 
                       <small>
-                        R$ {product.preco.toFixed(2).replace(".", ",")}
+                        {moeda(product.preco)}
                       </small>
 
                       <button onClick={() => addToCart(product)} disabled={ehMeu(product) || !product.disponivel}>

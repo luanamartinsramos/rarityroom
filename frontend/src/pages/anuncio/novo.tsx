@@ -38,16 +38,6 @@ const INICIAL: AnuncioForm = {
   destaque: false,
 };
 
-const campo = {
-  width: "100%",
-  padding: 10,
-  marginTop: 6,
-  borderRadius: 8,
-  border: "1px solid rgba(255,255,255,.15)",
-  background: "rgba(255,255,255,.04)",
-  color: "inherit",
-} as const;
-
 function NovoAnuncioPagina() {
   const navigate = useNavigate();
 
@@ -145,99 +135,109 @@ function NovoAnuncioPagina() {
         <h1>Novo anúncio</h1>
       </div>
 
-      <div className="avaliacoes" style={{ maxWidth: 720 }}>
-        <div className="notificacao">
-          <div style={{ width: "100%", display: "grid", gap: 12 }}>
-            <label>
-              Nome do produto
-              <input value={form.nome} onChange={(e) => alterar("nome", e.target.value)} placeholder="Funko Pop Batman #01" style={campo} />
-            </label>
+      <form
+        className="form-cartao"
+        onSubmit={(evento) => {
+          evento.preventDefault();
+          void publicar();
+        }}
+      >
+        <div className="grade-form">
+          <label className="campo col-cheia">
+            Nome do produto
+            <input value={form.nome} onChange={(e) => alterar("nome", e.target.value)} placeholder="Funko Pop Batman #01" />
+          </label>
 
-            <label>
-              Descrição
-              <textarea rows={4} value={form.descricao} onChange={(e) => alterar("descricao", e.target.value)} placeholder="Estado, detalhes, o que acompanha..." style={campo} />
-            </label>
+          <label className="campo col-cheia">
+            Descrição
+            <textarea rows={4} value={form.descricao} onChange={(e) => alterar("descricao", e.target.value)} placeholder="Estado, detalhes, o que acompanha..." />
+          </label>
 
-            <label>
-              Preço (R$)
-              <input value={form.preco} onChange={(e) => alterar("preco", e.target.value)} placeholder="249,90" style={campo} />
-            </label>
+          <label className="campo col-2">
+            Preço (R$)
+            <input inputMode="decimal" value={form.preco} onChange={(e) => alterar("preco", e.target.value)} placeholder="249,90" />
+          </label>
 
-            <label>
-              Estoque
-              <input value={form.estoque} onChange={(e) => alterar("estoque", e.target.value)} style={campo} />
-            </label>
+          <label className="campo col-2">
+            Estoque
+            <input type="number" min={1} value={form.estoque} onChange={(e) => alterar("estoque", e.target.value)} />
+          </label>
 
-            <label>
-              Categoria
-              <select value={form.categoria} onChange={(e) => alterar("categoria", e.target.value)} style={campo}>
-                {categorias.map((categoria) => (
-                  <option key={categoria.id} value={categoria.nome}>{categoria.nome}</option>
-                ))}
-              </select>
-            </label>
+          <label className="campo col-2">
+            Categoria
+            <select value={form.categoria} onChange={(e) => alterar("categoria", e.target.value)}>
+              {categorias.map((categoria) => (
+                <option key={categoria.id} value={categoria.nome}>{categoria.nome}</option>
+              ))}
+            </select>
+          </label>
 
-            <label>
-              Franquia
-              <input value={form.franquia} onChange={(e) => alterar("franquia", e.target.value)} placeholder="DC, Marvel, Naruto..." style={campo} />
-            </label>
+          <label className="campo col-2">
+            Franquia
+            <input value={form.franquia} onChange={(e) => alterar("franquia", e.target.value)} placeholder="DC, Marvel, Naruto..." />
+          </label>
 
-            <label>
-              Marca
-              <input value={form.marca} onChange={(e) => alterar("marca", e.target.value)} style={campo} />
-            </label>
+          <label className="campo col-2">
+            Marca
+            <input value={form.marca} onChange={(e) => alterar("marca", e.target.value)} placeholder="Bandai, Hasbro..." />
+          </label>
 
-            <label>
-              Coleção
-              <input value={form.colecao} onChange={(e) => alterar("colecao", e.target.value)} style={campo} />
-            </label>
+          <label className="campo col-2">
+            Coleção
+            <input value={form.colecao} onChange={(e) => alterar("colecao", e.target.value)} placeholder="Ex.: 30 anos" />
+          </label>
 
-            <label>
-              Condição
-              <select value={form.condicao} onChange={(e) => alterar("condicao", e.target.value)} style={campo}>
-                <option value="Novo">Novo</option>
-                <option value="Seminovo">Seminovo</option>
-                <option value="Usado">Usado</option>
-              </select>
-            </label>
+          <label className="campo col-2">
+            Condição
+            <select value={form.condicao} onChange={(e) => alterar("condicao", e.target.value)}>
+              <option value="Novo">Novo</option>
+              <option value="Seminovo">Seminovo</option>
+              <option value="Usado">Usado</option>
+            </select>
+          </label>
 
-            <label>
-              Raridade
-              <select value={form.raridade} onChange={(e) => alterar("raridade", e.target.value)} style={campo}>
-                <option value="Comum">Comum</option>
-                <option value="Raro">Raro</option>
-                <option value="Epico">Épico</option>
-                <option value="Lendario">Lendário</option>
-              </select>
-            </label>
+          <label className="campo col-2">
+            Raridade
+            <select value={form.raridade} onChange={(e) => alterar("raridade", e.target.value)}>
+              <option value="Comum">Comum</option>
+              <option value="Raro">Raro</option>
+              <option value="Epico">Épico</option>
+              <option value="Lendario">Lendário</option>
+            </select>
+          </label>
 
-            <label>
-              Forma de negociação
-              <select value={form.modalidade} onChange={(e) => alterar("modalidade", e.target.value)} style={campo}>
-                <option value="PrecoFixo">Preço fixo</option>
-                <option value="AceitaOferta">Aceita ofertas</option>
-                <option value="Liquidacao">Liquidação</option>
-              </select>
-            </label>
+          <label className="campo col-2">
+            Forma de negociação
+            <select value={form.modalidade} onChange={(e) => alterar("modalidade", e.target.value)}>
+              <option value="PrecoFixo">Preço fixo</option>
+              <option value="AceitaOferta">Aceita ofertas</option>
+              <option value="Liquidacao">Liquidação</option>
+            </select>
+          </label>
 
-            <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <input type="checkbox" checked={form.edicaoLimitada} onChange={(e) => alterar("edicaoLimitada", e.target.checked)} />
-              Edição limitada
-            </label>
+          <label className="campo-check">
+            <input type="checkbox" checked={form.edicaoLimitada} onChange={(e) => alterar("edicaoLimitada", e.target.checked)} />
+            Edição limitada
+          </label>
 
-            <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <input type="checkbox" checked={form.destaque} onChange={(e) => alterar("destaque", e.target.checked)} />
-              Destacar na vitrine
-            </label>
+          <label className="campo-check">
+            <input type="checkbox" checked={form.destaque} onChange={(e) => alterar("destaque", e.target.checked)} />
+            Destacar na vitrine
+          </label>
 
-            {erro && <p style={{ color: "#ff8b8b" }} role="alert">{erro}</p>}
-
-            <button onClick={publicar} disabled={enviando}>
-              {enviando ? "Publicando..." : "Publicar anúncio"}
-            </button>
-          </div>
+          {erro && <p className="form-erro col-cheia" role="alert">{erro}</p>}
         </div>
-      </div>
+
+        <div className="form-rodape">
+          <button type="button" className="botao" onClick={() => navigate("/home")}>
+            Cancelar
+          </button>
+
+          <button type="submit" className="botao-primario" disabled={enviando}>
+            {enviando ? "Publicando..." : "Publicar anúncio"}
+          </button>
+        </div>
+      </form>
     </main>
   );
 }

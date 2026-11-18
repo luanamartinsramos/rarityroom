@@ -17,6 +17,7 @@ import type { PedidoApi } from "../../services/pedidosService";
 import type { Produto } from "../../services/produtosService";
 
 import "../shared/paginas.css";
+import { moeda } from "../../utils/formato";
 
 type Aba = "usuarios" | "anuncios" | "pedidos";
 
@@ -55,6 +56,8 @@ function AdminPagina() {
   }
 
   useEffect(() => {
+    // carregar() só altera estado depois do await, então não há render em cascata.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void carregar();
   }, []);
 
@@ -128,7 +131,7 @@ function AdminPagina() {
           </span>
           <span className="produto-tag">Pedidos: {resumo.pedidos}</span>
           <span className="produto-tag">
-            Total vendido: R$ {resumo.totalVendido.toFixed(2).replace(".", ",")}
+            Total vendido: {moeda(resumo.totalVendido)}
           </span>
         </div>
       )}
@@ -180,7 +183,7 @@ function AdminPagina() {
                 <strong>{anuncio.nome}</strong>
 
                 <p>
-                  R$ {anuncio.preco.toFixed(2).replace(".", ",")} ·{" "}
+                  {moeda(anuncio.preco)} ·{" "}
                   {anuncio.categoria} · {anuncio.estado}
                 </p>
 
@@ -216,8 +219,8 @@ function AdminPagina() {
                   <strong>Pedido {pedido.codigo}</strong>
 
                   <p>
-                    {pedido.nomeProduto} · {pedido.quantidadeTotal} un. · R${" "}
-                    {pedido.total.toFixed(2).replace(".", ",")}
+                    {pedido.nomeProduto} · {pedido.quantidadeTotal} un. ·{" "}
+                    {moeda(pedido.total)}
                   </p>
 
                   <small>

@@ -18,7 +18,7 @@ import {
   type PerfilApi,
 } from "../../services/perfilService";
 
-import { urlImagem } from "../../utils/formato";
+import { urlImagem, rotulo } from "../../utils/formato";
 import "../shared/paginas.css";
 
 const ENDERECO_VAZIO: EnderecoForm = {
@@ -30,16 +30,6 @@ const ENDERECO_VAZIO: EnderecoForm = {
   cidade: "",
   estado: "",
 };
-
-const campo = {
-  width: "100%",
-  padding: 10,
-  marginTop: 6,
-  borderRadius: 8,
-  border: "1px solid rgba(255,255,255,.15)",
-  background: "rgba(255,255,255,.04)",
-  color: "inherit",
-} as const;
 
 function PerfilPagina() {
   const navigate = useNavigate();
@@ -70,6 +60,8 @@ function PerfilPagina() {
   }
 
   useEffect(() => {
+    // carregar() só altera estado depois do await, então não há render em cascata.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void carregar();
   }, []);
 
@@ -194,19 +186,11 @@ function PerfilPagina() {
             <strong>{perfil.nome}</strong>
 
             <div style={{ fontSize: 13, color: "#9b9b9b" }}>
-              {perfil.email} · {perfil.tipoConta}
+              {perfil.email} · {rotulo(perfil.tipoConta)}
             </div>
           </div>
 
-          <label
-            style={{
-              cursor: "pointer",
-              padding: "8px 12px",
-              borderRadius: 8,
-              border: "1px solid rgba(255,255,255,.15)",
-              fontSize: 13,
-            }}
-          >
+          <label className="botao">
             Trocar foto
             <input
               type="file"
@@ -218,45 +202,40 @@ function PerfilPagina() {
         </div>
       )}
 
-      <h2 style={{ marginTop: 32 }}>Dados da conta</h2>
+      <h2>Dados da conta</h2>
 
-      <div className="avaliacoes">
-        <div className="notificacao">
-          <div style={{ width: "100%" }}>
-            <label style={{ display: "block" }}>
-              Nome
-              <input
-                value={nome}
-                onChange={(evento) => setNome(evento.target.value)}
-                style={campo}
-              />
-            </label>
+      <div className="form-cartao">
+        <div className="campo-linha">
+          <label className="campo">
+            Nome
+            <input
+              value={nome}
+              onChange={(evento) => setNome(evento.target.value)}
+            />
+          </label>
 
-            <button style={{ marginTop: 10 }} onClick={salvarNome}>
-              Salvar nome
-            </button>
-          </div>
+          <button className="botao" onClick={salvarNome}>
+            Salvar nome
+          </button>
         </div>
 
-        <div className="notificacao">
-          <div style={{ width: "100%" }}>
-            <label style={{ display: "block" }}>
-              E-mail
-              <input
-                value={email}
-                onChange={(evento) => setEmail(evento.target.value)}
-                style={campo}
-              />
-            </label>
+        <div className="campo-linha" style={{ marginTop: 16 }}>
+          <label className="campo">
+            E-mail
+            <input
+              type="email"
+              value={email}
+              onChange={(evento) => setEmail(evento.target.value)}
+            />
+          </label>
 
-            <button style={{ marginTop: 10 }} onClick={salvarEmail}>
-              Salvar e-mail
-            </button>
-          </div>
+          <button className="botao" onClick={salvarEmail}>
+            Salvar e-mail
+          </button>
         </div>
       </div>
 
-      <h2 style={{ marginTop: 32 }}>Endereços</h2>
+      <h2>Endereços</h2>
 
       {enderecos.length === 0 ? (
         <div className="pagina-vazio">
@@ -279,7 +258,7 @@ function PerfilPagina() {
                 <small>CEP {endereco.cep}</small>
               </div>
 
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <div className="endereco-acoes">
                 {!endereco.principal && (
                   <button onClick={() => tornarPrincipal(endereco.id)}>
                     Tornar principal
@@ -293,75 +272,79 @@ function PerfilPagina() {
         </div>
       )}
 
-      <h2 style={{ marginTop: 32 }}>Novo endereço</h2>
+      <h2>Novo endereço</h2>
 
-      <div className="notificacao">
-        <div style={{ width: "100%", display: "grid", gap: 10 }}>
-          <input
-            placeholder="CEP (00000-000)"
-            value={novo.cep}
-            onChange={(evento) =>
-              setNovo({ ...novo, cep: evento.target.value })
-            }
-            style={campo}
-          />
+      <div className="form-cartao">
+        <div className="grade-form">
+          <label className="campo col-2">
+            CEP
+            <input placeholder="00000-000"
+              value={novo.cep}
+              onChange={(evento) =>
+                setNovo({ ...novo, cep: evento.target.value })
+              }
+            />
+          </label>
+          <label className="campo col-4">
+            Logradouro
+            <input placeholder="Rua, avenida..."
+              value={novo.logradouro}
+              onChange={(evento) =>
+                setNovo({ ...novo, logradouro: evento.target.value })
+              }
+            />
+          </label>
+          <label className="campo col-2">
+            Número
+            <input
+              value={novo.numero}
+              onChange={(evento) =>
+                setNovo({ ...novo, numero: evento.target.value })
+              }
+            />
+          </label>
+          <label className="campo col-4">
+            Complemento
+            <input placeholder="Apto, bloco (opcional)"
+              value={novo.complemento}
+              onChange={(evento) =>
+                setNovo({ ...novo, complemento: evento.target.value })
+              }
+            />
+          </label>
+          <label className="campo col-2">
+            Bairro
+            <input
+              value={novo.bairro}
+              onChange={(evento) =>
+                setNovo({ ...novo, bairro: evento.target.value })
+              }
+            />
+          </label>
+          <label className="campo col-2">
+            Cidade
+            <input
+              value={novo.cidade}
+              onChange={(evento) =>
+                setNovo({ ...novo, cidade: evento.target.value })
+              }
+            />
+          </label>
+          <label className="campo col-2">
+            UF
+            <input maxLength={2} placeholder="SP"
+              value={novo.estado}
+              onChange={(evento) =>
+                setNovo({ ...novo, estado: evento.target.value })
+              }
+            />
+          </label>
+        </div>
 
-          <input
-            placeholder="Logradouro"
-            value={novo.logradouro}
-            onChange={(evento) =>
-              setNovo({ ...novo, logradouro: evento.target.value })
-            }
-            style={campo}
-          />
-
-          <input
-            placeholder="Número"
-            value={novo.numero}
-            onChange={(evento) =>
-              setNovo({ ...novo, numero: evento.target.value })
-            }
-            style={campo}
-          />
-
-          <input
-            placeholder="Complemento"
-            value={novo.complemento}
-            onChange={(evento) =>
-              setNovo({ ...novo, complemento: evento.target.value })
-            }
-            style={campo}
-          />
-
-          <input
-            placeholder="Bairro"
-            value={novo.bairro}
-            onChange={(evento) =>
-              setNovo({ ...novo, bairro: evento.target.value })
-            }
-            style={campo}
-          />
-
-          <input
-            placeholder="Cidade"
-            value={novo.cidade}
-            onChange={(evento) =>
-              setNovo({ ...novo, cidade: evento.target.value })
-            }
-            style={campo}
-          />
-
-          <input
-            placeholder="UF"
-            maxLength={2}
-            value={novo.estado}
-            onChange={(evento) =>
-              setNovo({ ...novo, estado: evento.target.value })
-            }
-            style={campo}
-          />
-
-          <button onClick={adicionarEndereco}>Adicionar endereço</button>
+        <div className="form-rodape">
+          <button className="botao-primario" onClick={adicionarEndereco}>
+            Adicionar endereço
+          </button>
         </div>
       </div>
     </main>

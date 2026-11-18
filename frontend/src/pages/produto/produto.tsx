@@ -3,7 +3,7 @@ import toast from "react-hot-toast";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { adicionarComAviso } from "../../services/carrinhoAcoes";
-import { moeda, urlImagem } from "../../utils/formato";
+import { moeda, urlImagem, rotulo } from "../../utils/formato";
 import { obterMeuId } from "../pedidos/rotulos";
 import { obterProduto, obterVendedor, type VendedorApi } from "../../services/catalogoService";
 import { obterProdutos, type Produto } from "../../services/produtosService";
@@ -17,8 +17,17 @@ import "../shared/compra.css";
 
 const API_FAVORITOS = "http://localhost:5000/api/favoritos";
 
+/**
+ * A chave pelo id faz a página recomeçar do zero ao navegar de um produto
+ * para outro (ex.: produtos relacionados), sem resetar estado num efeito.
+ */
 function ProdutoPagina() {
   const { id } = useParams();
+
+  return <ProdutoConteudo key={id} id={id} />;
+}
+
+function ProdutoConteudo({ id }: { id: string | undefined }) {
   const navigate = useNavigate();
 
   const [produto, setProduto] = useState<Produto | null>(null);
@@ -32,17 +41,13 @@ function ProdutoPagina() {
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState("");
 
-  useEffect(() => {
-    const produtoId = Number(id);
+  const produtoId = Number(id);
+  const idValido = Number.isFinite(produtoId);
 
-    if (!Number.isFinite(produtoId)) {
-      setErro("Anúncio inválido.");
-      setCarregando(false);
+  useEffect(() => {
+    if (!idValido) {
       return;
     }
-
-    setCarregando(true);
-    setQuantidade(1);
 
     obterMeuId().then(setMeuId).catch(() => setMeuId(0));
 
@@ -72,7 +77,7 @@ function ProdutoPagina() {
       })
       .catch(() => setErro("Não foi possível carregar este anúncio."))
       .finally(() => setCarregando(false));
-  }, [id]);
+  }, [produtoId, idValido]);
 
   async function alternarFavorito() {
     if (!produto) {
@@ -115,7 +120,7 @@ function ProdutoPagina() {
     }
   }
 
-  if (carregando) {
+  if (idValido && carregando) {
     return (
       <main className="pagina">
         <div className="pagina-carregando">Carregando anúncio...</div>
@@ -127,7 +132,7 @@ function ProdutoPagina() {
     return (
       <main className="pagina">
         <div className="pagina-vazio">
-          <h3>{erro || "Anúncio não encontrado"}</h3>
+          <h3>{!idValido ? "Anúncio inválido." : erro || "Anúncio não encontrado"}</h3>
 
           <button onClick={() => navigate("/home")}>Voltar ao catálogo</button>
         </div>
@@ -158,7 +163,7 @@ function ProdutoPagina() {
           <div className="produto-tags">
             <span className="produto-tag">{produto.categoria}</span>
             <span className="produto-tag">{produto.condicao || "Sem condição"}</span>
-            <span className="produto-tag">{produto.raridade}</span>
+            <span className="produto-tag">{rotulo(produto.raridade)}</span>
             {produto.franquia && (
               <span className="produto-tag">{produto.franquia}</span>
             )}

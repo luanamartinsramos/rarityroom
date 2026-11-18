@@ -1076,9 +1076,11 @@ input {
   }
 
   .login-box {
-    min-height: 100vh;
+    min-height: 0;
 
-    padding: 60px 10%;
+    justify-content: flex-start;
+
+    padding: 50px 10% 60px;
   }
 
   .showcase-content h1 {
@@ -1088,9 +1090,24 @@ input {
 
 @media (max-width: 550px) {
   .login-showcase {
-    min-height: 440px;
+    min-height: 0;
 
-    padding: 30px 25px;
+    gap: 32px;
+
+    padding: 30px 25px 36px;
+  }
+
+  .collection-cards,
+  .showcase-footer {
+    display: none;
+  }
+
+  .eyebrow {
+    font-size: 9px;
+
+    letter-spacing: 2px;
+
+    margin-bottom: 18px;
   }
 
   .login-box {

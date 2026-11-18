@@ -12,7 +12,7 @@ import {
   ROTULO_PEDIDO,
   type PedidoApi,
 } from "../../services/pedidosService";
-import { moeda, urlImagem } from "../../utils/formato";
+import { moeda, urlImagem, rotulo } from "../../utils/formato";
 import type { Produto } from "../../services/produtosService";
 import {
   aceitarProposta,
@@ -86,6 +86,8 @@ function ContaPagina() {
   }
 
   useEffect(() => {
+    // carregar() só altera estado depois do await, então não há render em cascata.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void carregar();
   }, []);
 
@@ -213,43 +215,41 @@ function ContaPagina() {
         <div className="produto-tags">
           <span className="produto-tag">{conta.nome}</span>
           <span className="produto-tag">{conta.email}</span>
-          <span className="produto-tag">Perfil: {conta.tipoConta ?? "—"}</span>
+          <span className="produto-tag">Perfil: {rotulo(conta.tipoConta)}</span>
           {conta.administrador && (
             <span className="produto-tag">Administrador</span>
           )}
         </div>
       )}
 
-      <div className="produto-acoes" style={{ marginBottom: 20 }}>
-        <button onClick={() => setAba("compras")}>
-          Compras ({compras.length})
-        </button>
-
+      <div className="atalhos">
+        <button onClick={() => navigate("/anuncios/novo")}>＋ Publicar anúncio</button>
         <button onClick={() => navigate("/pedidos")}>Histórico de compras</button>
-
         <button onClick={() => navigate("/carrinho")}>Carrinho</button>
-
-        <button onClick={() => setAba("vendas")}>
-          Vendas ({vendas.length})
-        </button>
-
-        <button onClick={() => setAba("favoritos")}>
-          Favoritos ({favoritos.length})
-        </button>
-
-        <button onClick={() => setAba("propostas")}>
-          Propostas ({propostas.length})
-        </button>
-
-        <button onClick={() => navigate("/anuncios/novo")}>Publicar anúncio</button>
-
-        <button onClick={() => navigate("/perfil")}>Perfil e endereços</button>
-
-        <button onClick={() => setAba("loja")}>Minha loja</button>
-
         <button onClick={() => navigate("/notificacoes")}>Notificações</button>
+        <button onClick={() => navigate("/perfil")}>Perfil e endereços</button>
+      </div>
 
-        <button onClick={() => navigate("/home")}>Vender / Anúncios</button>
+      <div className="abas" role="tablist">
+        {(
+          [
+            ["compras", `Compras (${compras.length})`],
+            ["vendas", `Vendas (${vendas.length})`],
+            ["favoritos", `Favoritos (${favoritos.length})`],
+            ["propostas", `Propostas (${propostas.length})`],
+            ["loja", "Minha loja"],
+          ] as [Aba, string][]
+        ).map(([valor, texto]) => (
+          <button
+            key={valor}
+            role="tab"
+            aria-selected={aba === valor}
+            className={aba === valor ? "ativa" : ""}
+            onClick={() => setAba(valor)}
+          >
+            {texto}
+          </button>
+        ))}
       </div>
 
       {aba === "compras" && (
@@ -384,7 +384,7 @@ function ContaPagina() {
 
                 <div className="cartao-produto-info">
                   <strong>{produto.nome}</strong>
-                  <span>R$ {produto.preco.toFixed(2).replace(".", ",")}</span>
+                  <span>{moeda(produto.preco)}</span>
 
                   <button onClick={() => desfavoritar(produto.id)}>
                     Remover
@@ -412,7 +412,7 @@ function ContaPagina() {
                 <div className="notificacao" key={proposta.id}>
                   <div>
                     <strong>
-                      R$ {proposta.valor.toFixed(2).replace(".", ",")} ·{" "}
+                      {moeda(proposta.valor)} ·{" "}
                       {proposta.estado}
                     </strong>
 

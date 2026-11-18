@@ -44,3 +44,25 @@ export function urlImagem(url: string | null | undefined): string | undefined {
 
   return url.startsWith("/uploads/") ? `http://localhost:5000${url}` : url;
 }
+
+const ROTULOS: Record<string, string> = {
+  Comum: "Comum",
+  Raro: "Raro",
+  Epico: "Épico",
+  Lendario: "Lendário",
+  Comprador: "Comprador",
+  Vendedor: "Vendedor",
+  Ambos: "Comprador e vendedor",
+  PrecoFixo: "Preço fixo",
+  AceitaOferta: "Aceita ofertas",
+  Liquidacao: "Liquidação",
+};
+
+/** Converte valores de enum do backend (sem acento) em texto para a tela. */
+export function rotulo(valor: string | null | undefined): string {
+  if (!valor) {
+    return "—";
+  }
+
+  return ROTULOS[valor] ?? valor;
+}

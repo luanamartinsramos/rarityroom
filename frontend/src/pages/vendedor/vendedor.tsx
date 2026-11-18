@@ -3,8 +3,8 @@ import { useNavigate, useParams } from "react-router-dom";
 
 import { obterVendedor, type VendedorApi } from "../../services/catalogoService";
 
-import { urlImagem } from "../../utils/formato";
 import "../shared/paginas.css";
+import { moeda, urlImagem, rotulo } from "../../utils/formato";
 
 function VendedorPagina() {
   const { id } = useParams();
@@ -14,12 +14,11 @@ function VendedorPagina() {
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState("");
 
-  useEffect(() => {
-    const vendedorId = Number(id);
+  const vendedorId = Number(id);
+  const idValido = Number.isFinite(vendedorId);
 
-    if (!Number.isFinite(vendedorId)) {
-      setErro("Vendedor inválido.");
-      setCarregando(false);
+  useEffect(() => {
+    if (!idValido) {
       return;
     }
 
@@ -27,7 +26,17 @@ function VendedorPagina() {
       .then(setVendedor)
       .catch(() => setErro("Não foi possível carregar este vendedor."))
       .finally(() => setCarregando(false));
-  }, [id]);
+  }, [vendedorId, idValido]);
+
+  if (!idValido) {
+    return (
+      <main className="pagina">
+        <div className="pagina-vazio">
+          <h3>Vendedor inválido.</h3>
+        </div>
+      </main>
+    );
+  }
 
   if (carregando) {
     return (
@@ -98,7 +107,7 @@ function VendedorPagina() {
         <span className="produto-tag">
           {vendedor.produtosVendidos} vendido(s)
         </span>
-        <span className="produto-tag">Perfil: {vendedor.tipoConta}</span>
+        <span className="produto-tag">Perfil: {rotulo(vendedor.tipoConta)}</span>
       </div>
 
       <h2 style={{ marginTop: 32 }}>Anúncios ativos</h2>
@@ -126,7 +135,7 @@ function VendedorPagina() {
 
               <div className="cartao-produto-info">
                 <strong>{anuncio.nome}</strong>
-                <span>R$ {anuncio.preco.toFixed(2).replace(".", ",")}</span>
+                <span>{moeda(anuncio.preco)}</span>
               </div>
             </article>
           ))}
