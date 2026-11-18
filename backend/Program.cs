@@ -191,6 +191,7 @@ app.UseForwardedHeaders();
 AplicarMigracoes(app);
 SemearCategorias(app);
 SemearAdministrador(app);
+SemearProdutosDemonstracao(app, pastaDados);
 
 // Primeiro na pilha: qualquer exceção de domínio lançada adiante é traduzida
 // em ProblemDetails antes de chegar ao cliente.
@@ -441,6 +442,124 @@ static void SemearCategorias(WebApplication app)
         {
             servicoCategorias.Criar(nome);
         }
+    }
+}
+
+/// <summary>
+/// Vitrine de demonstração. Com Demonstracao:SemearProdutos = true (variável
+/// Demonstracao__SemearProdutos) e o catálogo vazio, cria a conta
+/// "Loja RarityRoom" e anúncios com imagens embutidas no projeto
+/// (Dados/Demonstracao), copiadas para a pasta de uploads. Serve para
+/// hospedagens sem disco persistente, que começam com o banco vazio a cada
+/// deploy. Desligado por padrão: não interfere em testes nem em bancos reais.
+/// </summary>
+static void SemearProdutosDemonstracao(WebApplication app, string? pastaDados)
+{
+    if (!app.Configuration.GetValue<bool>("Demonstracao:SemearProdutos"))
+    {
+        return;
+    }
+
+    using var escopo = app.Services.CreateScope();
+
+    var produtos = escopo.ServiceProvider.GetRequiredService<IRepositorioProduto>();
+
+    if (produtos.ObterTodos().Count > 0)
+    {
+        return;
+    }
+
+    var usuarios = escopo.ServiceProvider.GetRequiredService<IRepositorioUsuario>();
+    var hash = escopo.ServiceProvider.GetRequiredService<IHashSenha>();
+
+    const string emailLoja = "loja@rarityroom.com";
+
+    // Senha aleatória e descartada: a conta só existe para ser dona da vitrine.
+    Usuario loja = usuarios.ObterPorEmail(emailLoja)
+        ?? usuarios.Adicionar(new Usuario(
+            "Loja RarityRoom",
+            emailLoja,
+            hash.CriarHash("Demo1-" + Convert.ToHexString(RandomNumberGenerator.GetBytes(12))),
+            TipoConta.Vendedor));
+
+    string origem = Path.Combine(AppContext.BaseDirectory, "Dados", "Demonstracao");
+    string destino = PastaUploads(app.Environment, pastaDados);
+
+    Directory.CreateDirectory(destino);
+
+    string Imagem(string arquivo)
+    {
+        string nome = "demo-" + arquivo;
+        string caminhoOrigem = Path.Combine(origem, arquivo);
+
+        if (!File.Exists(caminhoOrigem))
+        {
+            return string.Empty;
+        }
+
+        File.Copy(caminhoOrigem, Path.Combine(destino, nome), overwrite: true);
+
+        return "/uploads/" + nome;
+    }
+
+    var vitrine = new[]
+    {
+        (Nome: "Action Figure Goku Super Saiyajin Edição Comemorativa de 30 anos com base iluminada",
+            Descricao: "Figura de 30 cm com base de LED, articulações e pintura detalhada. Lacrada na caixa original, com certificado de autenticidade.",
+            Preco: 1299.90m, Estoque: 2, Categoria: "Action Figures", Marca: "Bandai", Colecao: "Edição 30 Anos",
+            Condicao: "Novo", Imagem: "action-figure.png", Franquia: "Dragon Ball", Raridade: Raridade.Lendario,
+            Limitada: true, Destaque: true, Modalidade: ModalidadeNegociacao.PrecoFixo),
+        (Nome: "Carta Charizard Holográfica 1ª Edição",
+            Descricao: "Carta holográfica de primeira edição, conservada em sleeve e top loader desde a compra. Cantos e superfície sem marcas.",
+            Preco: 4500.00m, Estoque: 1, Categoria: "Cartas Colecionáveis", Marca: "Wizards of the Coast", Colecao: "Base Set",
+            Condicao: "Seminovo", Imagem: "carta-holografica.png", Franquia: "Pokémon", Raridade: Raridade.Lendario,
+            Limitada: true, Destaque: true, Modalidade: ModalidadeNegociacao.AceitaOferta),
+        (Nome: "Funko Pop Darth Vader",
+            Descricao: "Boneco de vinil de 10 cm na caixa original com janela, sem amassados. Ótimo para começar a coleção.",
+            Preco: 189.90m, Estoque: 4, Categoria: "Funko Pop", Marca: "Funko", Colecao: "Star Wars",
+            Condicao: "Novo", Imagem: "funko.png", Franquia: "Star Wars", Raridade: Raridade.Comum,
+            Limitada: false, Destaque: false, Modalidade: ModalidadeNegociacao.PrecoFixo),
+        (Nome: "HQ Watchmen Edição Absoluta",
+            Descricao: "Edição de luxo em capa dura, formato grande e papel especial. Lida uma vez, sem marcas na lombada.",
+            Preco: 349.00m, Estoque: 3, Categoria: "HQs e Quadrinhos", Marca: "DC Comics", Colecao: "Edição Absoluta",
+            Condicao: "Seminovo", Imagem: "hq.png", Franquia: "Watchmen", Raridade: Raridade.Epico,
+            Limitada: false, Destaque: false, Modalidade: ModalidadeNegociacao.Liquidacao),
+        (Nome: "Caneca Térmica Hogwarts",
+            Descricao: "Caneca térmica de 450 ml com tampa, parede dupla e estampa dourada do castelo. Mantém a bebida quente por horas.",
+            Preco: 79.50m, Estoque: 6, Categoria: "Acessórios Geek", Marca: "Wizarding World", Colecao: "Hogwarts",
+            Condicao: "Novo", Imagem: "caneca.png", Franquia: "Harry Potter", Raridade: Raridade.Comum,
+            Limitada: false, Destaque: false, Modalidade: ModalidadeNegociacao.PrecoFixo),
+        (Nome: "Miniatura Millennium Falcon",
+            Descricao: "Miniatura em metal com suporte de exibição e iluminação nos motores. Acompanha caixa e manual.",
+            Preco: 899.00m, Estoque: 2, Categoria: "Filmes e Séries", Marca: "Hasbro", Colecao: "Star Wars Vintage",
+            Condicao: "Novo", Imagem: "nave.png", Franquia: "Star Wars", Raridade: Raridade.Raro,
+            Limitada: true, Destaque: true, Modalidade: ModalidadeNegociacao.AceitaOferta),
+        (Nome: "Pelúcia Pikachu",
+            Descricao: "Pelúcia macia de 30 cm com etiqueta original. Ideal para presente ou para decorar a estante.",
+            Preco: 120.00m, Estoque: 8, Categoria: "Pokémon", Marca: "Pokémon Center", Colecao: "Pelúcias",
+            Condicao: "Novo", Imagem: "pelucia.png", Franquia: "Pokémon", Raridade: Raridade.Comum,
+            Limitada: false, Destaque: false, Modalidade: ModalidadeNegociacao.PrecoFixo),
+    };
+
+    foreach (var item in vitrine)
+    {
+        var produto = new Produto(
+            loja.Id,
+            item.Nome,
+            item.Descricao,
+            item.Preco,
+            item.Estoque,
+            item.Categoria,
+            item.Marca,
+            item.Colecao,
+            item.Condicao,
+            Imagem(item.Imagem));
+
+        produto.DefinirDetalhes(item.Franquia, item.Raridade, item.Limitada);
+        produto.DefinirDestaque(item.Destaque);
+        produto.DefinirModalidade(item.Modalidade);
+
+        produtos.Adicionar(produto);
     }
 }
 

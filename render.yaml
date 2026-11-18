@@ -13,3 +13,7 @@ services:
       # ao criar o serviço: mínimo 8 caracteres, com letra e número.
       - key: Admin__Senha
         sync: false
+      # Banco vazio a cada deploy (plano gratuito): cria a vitrine de
+      # demonstração com imagens. Sem efeito quando já existem anúncios.
+      - key: Demonstracao__SemearProdutos
+        value: "true"

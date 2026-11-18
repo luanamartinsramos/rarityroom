@@ -379,6 +379,12 @@ apagados a cada reinício ou deploy**. Para manter os dados, adicione um disco
 persistente ao serviço (plano pago) montado em `/data` — o app já guarda
 banco, imagens e chaves de sessão nessa pasta (`Armazenamento__Pasta`).
 
+**Vitrine de demonstração.** Como o banco começa vazio a cada deploy, o
+`render.yaml` liga `Demonstracao__SemearProdutos=true`: com o catálogo vazio,
+o backend cria a conta "Loja RarityRoom" e 7 anúncios com imagens (embutidas
+em `backend/Dados/Demonstracao`). Se o serviço não foi criado pelo Blueprint,
+adicione essa variável em **Environment** no painel do Render.
+
 Para testar a imagem localmente:
 
 ```bash

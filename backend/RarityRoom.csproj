@@ -22,4 +22,11 @@
     <InternalsVisibleTo Include="RarityRoom.Tests" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Imagens dos anúncios de demonstração (ver SemearProdutosDemonstracao). -->
+    <None Include="Dados/Demonstracao/*.png"
+          CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>
