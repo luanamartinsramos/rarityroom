@@ -1,479 +1,527 @@
 {
   "projeto": "RarityRoom",
   "artefato": "evidencias-av2",
+  "atualizadoEm": "2026-11-18",
+  "integrantes": "README.md#integrantes",
   "ambiente": {
-    "sdkDotnet": "10.0.401",
+    "sdkDotnet": "10.0.404",
     "targetFramework": "net10.0",
-    "node": "v26.13.0",
     "frontend": "React 19 + Vite (porta 5173)",
     "backend": "ASP.NET Core (porta 5000)"
   },
   "banco": {
     "tipo": "SQLite",
     "orm": "EF Core 10.0.15",
+    "preparo": "automatico: as migracoes sao aplicadas na inicializacao (dotnet run) e em cada teste",
     "migracoes": [
       "20261115024545_Inicial",
-      "20261115030519_PedidosAvaliacoes",
+      "20261115025337_PedidosAvaliacoes",
       "20261115051041_PerfilECheckout",
-      "20261115053340_DetalhesDoProduto",
-      "20261115054915_Notificacoes",
-      "20261115055005_AlinharCategorias",
-      "20261115055425_Administrador",
-      "20261115055904_PagamentoDoPedido",
-      "20261115060145_AvaliacaoDoProduto",
-      "20261115060405_LojaDoVendedor",
-      "20261115055851_PerfilEnderecosESenha"
-    ],
-    "tabelas": [
-      "usuarios",
-      "categorias",
-      "produtos",
-      "propostas",
-      "favoritos",
-      "pedidos",
-      "avaliacoes",
-      "notificacoes",
-      "lojas",
-      "enderecos",
-      "recuperacoes_senha"
-    ],
-    "persistenciaComprovadaPorReinicio": true
+      "20261115052403_DetalhesDoProduto",
+      "20261115053927_Notificacoes",
+      "20261115054011_AlinharCategorias",
+      "20261115054449_Administrador",
+      "20261115054925_PagamentoDoPedido",
+      "20261115055135_AvaliacaoDoProduto",
+      "20261115055437_LojaDoVendedor",
+      "20261115055851_PerfilEnderecosESenha",
+      "20261117192524_CarrinhoPagamentosEItensDoPedido"
+    ]
   },
   "build": {
-    "comando": "dotnet build",
+    "comando": "dotnet build backend",
     "erros": 0,
     "avisos": 0
   },
   "testes": {
-    "comando": "dotnet test",
-    "total": 174,
-    "aprovados": 174,
+    "comando": "dotnet test tests/RarityRoom.Tests",
+    "total": 245,
+    "aprovados": 245,
     "falhas": 0,
-    "ignorados": 0,
-    "porArquivo": {
-      "Dominio/UsuarioTests.cs": 13,
-      "Dominio/ProdutoTransicoesTests.cs": 12,
-      "Servicos/ServicoAnunciosTests.cs": 11,
-      "Dominio/ProdutoValidacaoTests.cs": 10,
-      "Api/FluxoApiTests.cs": 24,
-      "Dominio/CategoriaTests.cs": 9,
-      "Repositorios/RepositorioEfTests.cs": 9,
-      "Servicos/ServicoAutenticacaoTests.cs": 9,
-      "Dominio/PedidoTests.cs": 12,
-      "Dominio/PropostaTests.cs": 7,
-      "Dominio/AvaliacaoTests.cs": 7,
-      "Negociacao/EstrategiasTests.cs": 6,
-      "Servicos/ServicoPropostasTests.cs": 6,
-      "Dominio/ProdutoPropriedadeTests.cs": 5,
-      "Repositorios/RepositorioProdutoTests.cs": 5,
-      "Servicos/ServicoFavoritosTests.cs": 5,
-      "Dominio/FavoritoTests.cs": 3,
-      "Servicos/ServicoAnunciosCategoriaTests.cs": 3,
-      "Dominio/BuscaTextoTests.cs": 6,
-      "Servicos/ServicoAnunciosBuscaTests.cs": 12
-    }
+    "ignorados": 0
   },
-  "criterios": {
+  "fluxos": {
+    "FL-01": "Publicar e gerenciar anuncio",
+    "FL-02": "Negociar por proposta",
+    "FL-03": "Comprar, pagar e estornar"
+  },
+  "regras": {
+    "R1": "So o proprietario altera o anuncio",
+    "R2": "Estado so muda por transicao permitida",
+    "R3": "Aceite da proposta depende da modalidade",
+    "R4": "Ninguem negocia o proprio anuncio",
+    "R5": "Estoque entre 0 e 100.000"
+  },
+  "resumo": {
     "total": 40,
-    "atendido": 39,
-    "parcial": 1,
-    "pendente": 0,
-    "parciais": [
-      {
-        "codigo": "E1",
-        "motivo": "comportamento antigo dos defeitos nao foi executado apos a reescrita"
-      }
-    ]
+    "atendido": 40,
+    "comRessalva": [
+      "G02"
+    ],
+    "naoAtendido": 0
   },
-  "evidenciasHttp": [
+  "criterios": [
     {
-      "metodo": "GET",
-      "rota": "/api/produtos",
-      "status": 200,
-      "observacao": "catalogo publico anonimo"
+      "item": "A01",
+      "situacao": "atendido",
+      "exigencia": "pelo menos cinco classes de dominio reais",
+      "documentos": [
+        "docs/av2/modelo-de-classes.md#1-classes-selecionadas-para-avaliação"
+      ],
+      "codigo": [
+        "backend/Models/Usuario.cs",
+        "backend/Models/Produto.cs",
+        "backend/Models/Proposta.cs",
+        "backend/Models/Pedido.cs",
+        "backend/Models/ItemPedido.cs",
+        "backend/Models/Categoria.cs",
+        "backend/Models/Favorito.cs"
+      ]
     },
     {
-      "metodo": "POST",
-      "rota": "/api/autenticacao/cadastrar",
-      "status": 200,
-      "observacao": "usuario criado e persistido"
+      "item": "A02",
+      "situacao": "atendido",
+      "exigencia": "duas ou mais classes com comportamento proprio",
+      "documentos": [
+        "docs/av2/modelo-de-classes.md"
+      ],
+      "codigo": [
+        "backend/Models/Produto.cs#AplicarOperacao",
+        "backend/Models/Produto.cs#BaixarEstoque",
+        "backend/Models/Pedido.cs#ConfirmarPagamento",
+        "backend/Models/Proposta.cs#Aceitar"
+      ],
+      "testes": [
+        "ProdutoTransicoesTests",
+        "EstoqueTests",
+        "PedidoTests"
+      ]
     },
     {
-      "metodo": "POST",
-      "rota": "/api/autenticacao/cadastrar",
-      "status": 409,
-      "observacao": "e-mail duplicado"
+      "item": "A03",
+      "situacao": "atendido",
+      "exigencia": "cinco regras de negocio implementadas e usadas",
+      "documentos": [
+        "docs/av2/requisitos.md#4-as-cinco-regras-de-negócio-centrais"
+      ],
+      "codigo": [
+        "backend/Models/Produto.cs",
+        "backend/Models/Negociacao/",
+        "backend/Services/ServicoPropostas.cs",
+        "backend/Models/Pedido.cs"
+      ]
     },
     {
-      "metodo": "PUT",
-      "rota": "/api/produtos/1",
-      "status": 403,
-      "observacao": "terceiro autenticado"
+      "item": "A04",
+      "situacao": "atendido",
+      "exigencia": "fluxo com colaboracao entre classes",
+      "documentos": [
+        "docs/av2/modelo-de-classes.md#8-responsabilidades-e-camadas",
+        "docs/av2/requisitos.md#fl-02--negociar-por-proposta"
+      ],
+      "codigo": [
+        "backend/Services/ServicoPropostas.cs#Aceitar"
+      ],
+      "testes": [
+        "Aceitar_DeveRecusarAsDemaisPendentes",
+        "Aceitar_MesmaOferta_DeveVariarPorModalidade"
+      ]
     },
     {
-      "metodo": "POST",
-      "rota": "/api/produtos",
-      "status": 400,
-      "observacao": "preco zero"
+      "item": "A05",
+      "situacao": "atendido",
+      "exigencia": "objeto central com tres ou mais estados e transicoes",
+      "documentos": [
+        "docs/av2/requisitos.md#5-estados-do-objeto-central-produto"
+      ],
+      "codigo": [
+        "backend/Models/Produto.cs#Transicoes",
+        "backend/Models/Enums/EstadoAnuncio.cs"
+      ],
+      "testes": [
+        "ProdutoTransicoesTests"
+      ]
     },
     {
-      "metodo": "PATCH",
-      "rota": "/api/produtos/1/estado",
-      "status": 409,
-      "observacao": "vender anuncio pausado"
+      "item": "A06",
+      "situacao": "atendido",
+      "exigencia": "transicao proibida rejeitada sem inconsistencia",
+      "documentos": [
+        "docs/av2/excecoes.md#falha-01--transição-de-estado-proibida-violação-de-regra-de-negócio-r2"
+      ],
+      "codigo": [
+        "backend/Models/Produto.cs#AplicarOperacao"
+      ],
+      "testes": [
+        "Falha01_VenderAnuncioPausado_Responde409_EEstadoContinuaPausado",
+        "CancelarReserva_DePausado_DeveFalhar"
+      ]
     },
     {
-      "metodo": "POST",
-      "rota": "/api/propostas/1/aceitar",
-      "status": 409,
-      "observacao": "PrecoFixo recusa oferta de 200"
+      "item": "A07",
+      "situacao": "atendido",
+      "exigencia": "regras protegidas por encapsulamento",
+      "documentos": [
+        "docs/av2/modelo-de-classes.md#7-invariantes-e-objeto-responsável-b07"
+      ],
+      "codigo": [
+        "backend/Models/Produto.cs (set privado, Transicoes private static readonly)"
+      ],
+      "testes": [
+        "BaixarEstoque_AcimaDoDisponivel_DeveFalharSemAlterar",
+        "Atualizar_PorOutroUsuario_NaoDeveAlterarDados"
+      ]
     },
     {
-      "metodo": "POST",
-      "rota": "/api/propostas/2/aceitar",
-      "status": 200,
-      "observacao": "Liquidacao aceita a mesma oferta"
+      "item": "A08",
+      "situacao": "atendido",
+      "exigencia": "polimorfismo real com contrato e implementacoes usadas",
+      "documentos": [
+        "docs/av2/modelo-de-classes.md#5-contrato-polimórfico-b06",
+        "docs/av2/decisoes-de-modelagem.md#dm-b--como-variar-a-decisão-de-aceitar-uma-proposta"
+      ],
+      "codigo": [
+        "backend/Models/Negociacao/IEstrategiaNegociacao.cs",
+        "backend/Models/Negociacao/EstrategiaPrecoFixo.cs",
+        "backend/Models/Negociacao/EstrategiaAceitaOferta.cs",
+        "backend/Models/Negociacao/EstrategiaLiquidacao.cs",
+        "backend/Program.cs (AddSingleton<IEstrategiaNegociacao, ...>)"
+      ],
+      "testes": [
+        "Aceitar_MesmaOferta_DeveVariarPorModalidade",
+        "OfertaDe200EmPrecoDe249_90_DeveVariarPorModalidade"
+      ]
     },
     {
-      "metodo": "POST",
-      "rota": "/api/pedidos",
-      "status": 201,
-      "observacao": "snapshot: nomeProduto Funko Joker, precoUnitario 399.9"
+      "item": "B01",
+      "situacao": "atendido",
+      "exigencia": "modelo textual com cinco ou mais classes",
+      "documentos": [
+        "docs/av2/modelo-de-classes.md#2-diagrama"
+      ],
+      "observacao": "Mermaid classDiagram"
     },
     {
-      "metodo": "POST",
-      "rota": "/api/pedidos/1/concluir",
-      "status": 403,
-      "observacao": "comprador tentando concluir"
+      "item": "B02",
+      "situacao": "atendido",
+      "exigencia": "classes do modelo correspondem ao codigo",
+      "documentos": [
+        "docs/av2/modelo-de-classes.md#6-correspondência-modelo--código-b02b03"
+      ]
     },
     {
-      "metodo": "POST",
-      "rota": "/api/pedidos/1/concluir",
-      "status": 200,
-      "observacao": "vendedor conclui; anuncio passa a Vendido"
+      "item": "B03",
+      "situacao": "atendido",
+      "exigencia": "atributos e metodos sem contradicao",
+      "documentos": [
+        "docs/av2/modelo-de-classes.md#6-correspondência-modelo--código-b02b03"
+      ]
     },
     {
-      "metodo": "POST",
-      "rota": "/api/avaliacoes",
-      "status": 201,
-      "observacao": "nota 5 do comprador"
+      "item": "B04",
+      "situacao": "atendido",
+      "exigencia": "associacao com multiplicidade implementada",
+      "documentos": [
+        "docs/av2/modelo-de-classes.md#3-associações-e-multiplicidades-b04"
+      ],
+      "codigo": [
+        "backend/Models/Produto.cs#UsuarioId",
+        "backend/Dados/RarityRoomContexto.cs"
+      ],
+      "testes": [
+        "Criar_DeveVincularProprietario"
+      ]
     },
     {
-      "metodo": "POST",
-      "rota": "/api/avaliacoes",
-      "status": 409,
-      "observacao": "pedido ja avaliado"
+      "item": "B05",
+      "situacao": "atendido",
+      "exigencia": "composicao com ciclo de vida comprovado",
+      "documentos": [
+        "docs/av2/modelo-de-classes.md#4-composição-e-ciclo-de-vida-b05"
+      ],
+      "codigo": [
+        "backend/Models/Pedido.cs (construtor)",
+        "backend/Dados/RarityRoomContexto.cs (OwnsMany Itens)"
+      ],
+      "testes": [
+        "Construtor_SemItens_DeveFalhar",
+        "Snapshot_NaoMudaQuandoOAnuncioMuda"
+      ]
     },
     {
-      "metodo": "GET",
-      "rota": "/api/avaliacoes/vendedor/1",
-      "status": 200,
-      "observacao": "media 5, total 1"
+      "item": "B06",
+      "situacao": "atendido",
+      "exigencia": "contrato polimorfico no modelo",
+      "documentos": [
+        "docs/av2/modelo-de-classes.md#5-contrato-polimórfico-b06"
+      ]
     },
     {
-      "metodo": "POST",
-      "rota": "/api/produtos/3/imagem",
-      "status": 200,
-      "observacao": "PNG aceito, retorna /uploads/{guid}.png"
+      "item": "B07",
+      "situacao": "atendido",
+      "exigencia": "invariante e objeto responsavel",
+      "documentos": [
+        "docs/av2/modelo-de-classes.md#7-invariantes-e-objeto-responsável-b07"
+      ]
     },
     {
-      "metodo": "GET",
-      "rota": "/uploads/{guid}.png",
-      "status": 200,
-      "observacao": "imagem servida com content-type image/png"
+      "item": "B08",
+      "situacao": "atendido",
+      "exigencia": "duas decisoes com alternativas comparadas",
+      "documentos": [
+        "docs/av2/decisoes-de-modelagem.md#dm-a--como-representar-o-ciclo-de-vida-do-anúncio",
+        "docs/av2/decisoes-de-modelagem.md#dm-b--como-variar-a-decisão-de-aceitar-uma-proposta"
+      ]
     },
     {
-      "metodo": "POST",
-      "rota": "/api/produtos/3/imagem",
-      "status": 400,
-      "observacao": "text/plain recusado"
+      "item": "C01",
+      "situacao": "atendido",
+      "exigencia": "alteracao funcional com diff verificavel",
+      "documentos": [
+        "docs/av2/code-review.md#1-alteração-selecionada-c01"
+      ],
+      "comandos": [
+        "git show 78cae8b"
+      ]
     },
     {
-      "metodo": "POST",
-      "rota": "/api/produtos/3/imagem",
-      "status": 403,
-      "observacao": "terceiro tentando enviar imagem"
+      "item": "C02",
+      "situacao": "atendido",
+      "exigencia": "alteracao corresponde a regra de negocio",
+      "documentos": [
+        "docs/av2/code-review.md#2-requisito-que-a-alteração-implementa-c02"
+      ],
+      "observacao": "R5 e CA-03.1/03.2"
     },
     {
-      "metodo": "GET",
-      "rota": "/api/produtos",
-      "status": 200,
-      "observacao": "apos reinicio: dados mantidos"
+      "item": "C03",
+      "situacao": "atendido",
+      "exigencia": "analise dos arquivos modificados e fora de escopo",
+      "documentos": [
+        "docs/av2/code-review.md#3-inventário-dos-arquivos-modificados-c03"
+      ]
     },
     {
-      "metodo": "POST",
-      "rota": "/api/autenticacao/cadastrar",
-      "status": 200,
-      "observacao": "tipoConta Comprador; /usuario-atual devolve o papel"
+      "item": "C04",
+      "situacao": "atendido",
+      "exigencia": "impacto com verificacao",
+      "documentos": [
+        "docs/av2/code-review.md#4-impacto-da-alteração-e-verificação-c04"
+      ],
+      "comandos": [
+        "dotnet test --filter \"FullyQualifiedName~Estoque|FullyQualifiedName~CancelarPedidoPago|FullyQualifiedName~DepuracaoEstoque\""
+      ]
     },
     {
-      "metodo": "GET",
-      "rota": "/api/pedidos",
-      "status": 200,
-      "observacao": "conta nova devolve lista vazia"
+      "item": "C05",
+      "situacao": "atendido",
+      "exigencia": "avaliacao por propriedades de POO",
+      "documentos": [
+        "docs/av2/code-review.md#5-avaliação-por-propriedades-de-poo-c05"
+      ]
     },
     {
-      "metodo": "POST",
-      "rota": "/api/produtos",
-      "status": 403,
-      "observacao": "conta de comprador nao publica"
+      "item": "C06",
+      "situacao": "atendido",
+      "exigencia": "decisao aceitar/corrigir/rejeitar",
+      "documentos": [
+        "docs/av2/code-review.md#6-decisão-técnica-c06"
+      ],
+      "observacao": "aceitar com correcao; correcao no commit 116d245"
     },
     {
-      "metodo": "POST",
-      "rota": "/api/pedidos",
-      "status": 201,
-      "observacao": "checkout com entrega e formaPagamento Pix"
+      "item": "D01",
+      "situacao": "atendido",
+      "exigencia": "tres situacoes de falha diferenciadas",
+      "documentos": [
+        "docs/av2/excecoes.md#2-as-três-situações-de-falha-d01"
+      ]
     },
     {
-      "metodo": "POST",
-      "rota": "/api/pedidos",
-      "status": 400,
-      "observacao": "checkout sem endereco recusado"
+      "item": "D02",
+      "situacao": "atendido",
+      "exigencia": "caminho reproduzivel de propagacao",
+      "documentos": [
+        "docs/av2/excecoes.md#3-caminho-reproduzível-de-lançamento-e-propagação-d02"
+      ],
+      "codigo": [
+        "backend/Middleware/MiddlewareExcecoes.cs"
+      ]
     },
     {
-      "metodo": "POST",
-      "rota": "/api/pedidos",
-      "status": 403,
-      "observacao": "conta de vendedor nao compra"
+      "item": "D03",
+      "situacao": "atendido",
+      "exigencia": "tratamento sem ocultar nem vazar",
+      "documentos": [
+        "docs/av2/excecoes.md#4-tratamento-central-sem-ocultar-nem-vazar-d03"
+      ],
+      "codigo": [
+        "backend/Middleware/MiddlewareExcecoes.cs"
+      ]
     },
     {
-      "metodo": "POST",
-      "rota": "/api/produtos",
-      "status": 201,
-      "observacao": "franquia Dragon Ball, raridade Lendario, edicaoLimitada e destaque"
+      "item": "D04",
+      "situacao": "atendido",
+      "exigencia": "testes das tres situacoes",
+      "documentos": [
+        "docs/av2/excecoes.md#5-testes-das-três-situações-d04"
+      ],
+      "codigo": [
+        "tests/RarityRoom.Tests/Api/FalhasApiTests.cs"
+      ],
+      "testes": [
+        "Falha01_VenderAnuncioPausado_Responde409_EEstadoContinuaPausado",
+        "Falha02_AnuncioComPrecoZero_Responde400_ENadaEGravado",
+        "Falha03_ErroInesperado_Responde500Generico_SemVazarDetalhes_ERegistraNoLog"
+      ]
     },
     {
-      "metodo": "GET",
-      "rota": "/api/produtos?franquia=dragon ball",
-      "status": 200,
-      "observacao": "1 resultado"
+      "item": "E01",
+      "situacao": "atendido",
+      "exigencia": "defeito reproduzivel com evidencia",
+      "documentos": [
+        "docs/av2/debugging.md#1-reprodução-e01"
+      ],
+      "codigo": [
+        "tests/RarityRoom.Tests/Api/DepuracaoEstoqueTests.cs"
+      ],
+      "testes": [
+        "EstornoDeCompraPaga_ComEstoqueNoLimite_NaoDeixaEstoqueNegativo"
+      ],
+      "observacao": "falha em 166c21d com estoque -2147483648"
     },
     {
-      "metodo": "GET",
-      "rota": "/api/produtos?destaque=true",
-      "status": 200,
-      "observacao": "1 resultado"
+      "item": "E02",
+      "situacao": "atendido",
+      "exigencia": "condicoes, esperado e observado",
+      "documentos": [
+        "docs/av2/debugging.md#2-condições-esperado-e-observado-e02"
+      ]
     },
     {
-      "metodo": "GET",
-      "rota": "/api/produtos?precoMin=500&precoMax=1000",
-      "status": 200,
-      "observacao": "2 resultados"
+      "item": "E03",
+      "situacao": "atendido",
+      "exigencia": "hipoteses e investigacao",
+      "documentos": [
+        "docs/av2/debugging.md#3-hipóteses-e-investigação-e03"
+      ]
     },
     {
-      "metodo": "GET",
-      "rota": "/api/produtos?ordem=MenorPreco",
-      "status": 200,
-      "observacao": "249.93, 349.9, 399.9, 500, 899.9"
+      "item": "E04",
+      "situacao": "atendido",
+      "exigencia": "tecnica de depuracao comprovada",
+      "documentos": [
+        "docs/av2/debugging.md#4-técnica-aplicada-rastreamento-por-log-e04"
+      ],
+      "observacao": "rastreamento por log; rastro reproduzido no documento"
     },
     {
-      "metodo": "GET",
-      "rota": "/api/categorias",
-      "status": 200,
-      "observacao": "15 categorias geek da especificacao"
+      "item": "E05",
+      "situacao": "atendido",
+      "exigencia": "causa, correcao e eliminacao",
+      "documentos": [
+        "docs/av2/debugging.md#5-causa-raiz-e-correção-e05"
+      ],
+      "comandos": [
+        "git show 116d245 -- backend/Models/Produto.cs"
+      ]
     },
     {
-      "metodo": "GET",
-      "rota": "/api/produtos?tamanhoPagina=2",
-      "status": 200,
-      "observacao": "X-Total-Count 6, 2 itens na pagina"
+      "item": "E06",
+      "situacao": "atendido",
+      "exigencia": "antes e depois + comparacao de tecnicas",
+      "documentos": [
+        "docs/av2/debugging.md#6-antes--depois-e-comparação-de-técnicas-e06"
+      ]
     },
     {
-      "metodo": "GET",
-      "rota": "/api/vendedores/1",
-      "status": 200,
-      "observacao": "perfil publico: reputacao 5/1, 4 anuncios ativos, 1 vendido"
+      "item": "F01",
+      "situacao": "atendido",
+      "exigencia": "sucesso e violacao das cinco regras",
+      "documentos": [
+        "docs/av2/testes.md#3-testes-das-cinco-regras-sucesso-e-violação-f01"
+      ],
+      "observacao": "22 cenarios"
     },
     {
-      "metodo": "POST",
-      "rota": "/api/propostas",
-      "status": 201,
-      "observacao": "proposta dispara notificacao para o vendedor"
+      "item": "F02",
+      "situacao": "atendido",
+      "exigencia": "invariante violada e objeto valido",
+      "documentos": [
+        "docs/av2/testes.md#4-invariante-violada-e-objeto-válido-f02"
+      ],
+      "testes": [
+        "BaixarEstoque_AcimaDoDisponivel_DeveFalharSemAlterar"
+      ]
     },
     {
-      "metodo": "GET",
-      "rota": "/api/notificacoes",
-      "status": 200,
-      "observacao": "naoLidas 1, tipo PropostaRecebida"
+      "item": "F03",
+      "situacao": "atendido",
+      "exigencia": "integracao pela API com regra e persistencia",
+      "documentos": [
+        "docs/av2/testes.md#5-integração-pela-api-com-regra-e-persistência-f03"
+      ],
+      "testes": [
+        "Falha01_VenderAnuncioPausado_Responde409_EEstadoContinuaPausado"
+      ]
     },
     {
-      "metodo": "POST",
-      "rota": "/api/autenticacao/entrar",
-      "status": 200,
-      "observacao": "admin@rarityroom.com (conta de demonstracao)"
+      "item": "F04",
+      "situacao": "atendido",
+      "exigencia": "build e testes a partir de clone limpo",
+      "documentos": [
+        "docs/av2/testes.md#1-como-executar-a-partir-de-um-clone-limpo-f04",
+        "README.md"
+      ],
+      "comandos": [
+        "dotnet build backend",
+        "dotnet test tests/RarityRoom.Tests"
+      ]
     },
     {
-      "metodo": "GET",
-      "rota": "/api/admin/resumo",
-      "status": 200,
-      "observacao": "7 usuarios, 5 anuncios ativos, 3 pedidos, R$ 399,90 vendidos"
+      "item": "F05",
+      "situacao": "atendido",
+      "exigencia": "rastreabilidade fluxos x regras x implementacao x testes",
+      "documentos": [
+        "docs/av2/testes.md#6-matriz-de-rastreabilidade-f05"
+      ]
     },
     {
-      "metodo": "GET",
-      "rota": "/api/admin/usuarios",
-      "status": 200,
-      "observacao": "lista com papel, situacao e flag de administrador"
+      "item": "F06",
+      "situacao": "atendido",
+      "exigencia": "auditoria final honesta",
+      "documentos": [
+        "docs/av2/auditoria-final.md"
+      ]
     },
     {
-      "metodo": "GET",
-      "rota": "/api/admin/resumo",
-      "status": 403,
-      "observacao": "conta comum recebe acesso-negado"
+      "item": "G01",
+      "situacao": "atendido",
+      "exigencia": "especificacao verificavel dos fluxos e regras",
+      "documentos": [
+        "docs/av2/requisitos.md"
+      ]
     },
     {
-      "metodo": "POST",
-      "rota": "/api/pedidos/{id}/pagar",
-      "status": 200,
-      "observacao": "pagamento simulado aprovado: estado Pago, statusPagamento Pago"
-    },
-    {
-      "metodo": "POST",
-      "rota": "/api/pedidos/{id}/enviar",
-      "status": 200,
-      "observacao": "vendedor marca envio apos pagamento"
-    },
-    {
-      "metodo": "POST",
-      "rota": "/api/pedidos/{id}/entregar",
-      "status": 200,
-      "observacao": "comprador confirma entrega: estado Entregue"
-    },
-    {
-      "metodo": "POST",
-      "rota": "/api/pedidos/{id}/enviar",
-      "status": 409,
-      "observacao": "envio antes do pagamento recusado"
-    },
-    {
-      "metodo": "POST",
-      "rota": "/api/pedidos/{id}/pagar",
-      "status": 409,
-      "observacao": "pagamento recusado: codigo pagamento-recusado, status persistido"
-    },
-    {
-      "metodo": "GET",
-      "rota": "/api/avaliacoes/produto/{id}",
-      "status": 200,
-      "observacao": "produto 2: media 5, total 1 (backfill das avaliacoes antigas)"
-    },
-    {
-      "metodo": "GET",
-      "rota": "/api/avaliacoes/produto/{id}",
-      "status": 200,
-      "observacao": "produto sem venda: media 0, total 0"
-    },
-    {
-      "metodo": "POST",
-      "rota": "/api/lojas",
-      "status": 201,
-      "observacao": "vendedor cria loja"
-    },
-    {
-      "metodo": "PUT",
-      "rota": "/api/lojas",
-      "status": 200,
-      "observacao": "nome e descricao com acento em UTF-8"
-    },
-    {
-      "metodo": "POST",
-      "rota": "/api/lojas",
-      "status": 409,
-      "observacao": "segunda loja recusada"
-    },
-    {
-      "metodo": "POST",
-      "rota": "/api/lojas",
-      "status": 403,
-      "observacao": "conta de comprador nao pode ter loja"
-    },
-    {
-      "metodo": "GET",
-      "rota": "/api/vendedores/1",
-      "status": 200,
-      "observacao": "perfil inclui a loja (nome, descricao, foto)"
-    },
-    {
-      "metodo": "GET",
-      "rota": "/api/perfil",
-      "status": 200,
-      "observacao": "nome, email, foto e tipo de conta"
-    },
-    {
-      "metodo": "PUT",
-      "rota": "/api/perfil/nome",
-      "status": 200,
-      "observacao": "altera nome do usuario"
-    },
-    {
-      "metodo": "POST",
-      "rota": "/api/enderecos",
-      "status": 201,
-      "observacao": "primeiro endereco vira principal (São Paulo)"
-    },
-    {
-      "metodo": "DELETE",
-      "rota": "/api/enderecos/{id}",
-      "status": 204,
-      "observacao": "remove principal e promove outro"
-    },
-    {
-      "metodo": "POST",
-      "rota": "/api/autenticacao/recuperar-senha",
-      "status": 200,
-      "observacao": "token de demonstracao gerado"
-    },
-    {
-      "metodo": "POST",
-      "rota": "/api/autenticacao/redefinir-senha",
-      "status": 200,
-      "observacao": "senha antiga passa a dar 401, nova da 200"
-    },
-    {
-      "metodo": "POST",
-      "rota": "/api/autenticacao/redefinir-senha",
-      "status": 400,
-      "observacao": "token reutilizado e recusado"
-    },
-    {
-      "metodo": "POST",
-      "rota": "/api/autenticacao/cadastrar",
-      "status": 200,
-      "observacao": "sem campo tipoConta: toda conta nasce compradora e vendedora"
-    },
-    {
-      "metodo": "POST",
-      "rota": "/api/produtos",
-      "status": 201,
-      "observacao": "conta criada sem tipoConta publica anuncio"
-    },
-    {
-      "metodo": "POST",
-      "rota": "/api/pedidos",
-      "status": 201,
-      "observacao": "a mesma conta compra o anuncio de outra e vende o seu"
-    },
-    {
-      "metodo": "POST",
-      "rota": "/api/lojas",
-      "status": 201,
-      "observacao": "qualquer conta cria loja"
+      "item": "G02",
+      "situacao": "atendido",
+      "exigencia": "especificacao para o DsCode com inspecao do resultado",
+      "documentos": [
+        "docs/av2/especificacao-dscode.md",
+        "management/cross-session/av2-handoff.md"
+      ],
+      "testes": [
+        "ContaUnica_PodePublicarEComprar",
+        "Loja_QualquerContaPodeCriar"
+      ],
+      "observacao": "texto da especificacao reconstruido a partir do registro da sessao do DsCode (declarado no documento)"
     }
   ],
-  "codigo": {
-    "arquivosBackend": 74,
-    "linhasBackend": 5181,
-    "arquivosTestes": 25,
-    "linhasTestes": 2333,
-    "classesDeDominio": 7,
-    "implementacoesDeEstrategia": 3,
-    "tiposDeExcecao": 6,
-    "migracoes": 5,
-    "endpointsHttp": 24
-  },
   "limitacoes": [
-    "sem paginacao ou busca no servidor",
-    "sem teste contra PostgreSQL ou SQL Server",
-    "upload aceita apenas JPG, PNG e WEBP de ate 2 MB",
-    "pagamento e envio fora do escopo"
+    "pagamento, PIX e boleto simulados",
+    "token de recuperacao de senha vai para o log (sem e-mail)",
+    "frontend sem testes automatizados",
+    "entidades serializadas direto no JSON (sem DTOs)",
+    "associacoes entre agregados sem FK no banco"
   ]
 }

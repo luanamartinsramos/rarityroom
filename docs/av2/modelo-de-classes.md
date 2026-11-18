@@ -1,6 +1,22 @@
 # Modelo de classes — RarityRoom
 
-## 1. Visão geral
+Modelo textual (Mermaid `classDiagram`, interpretável por ferramentas e pelo
+GitHub). Todo atributo e método listado existe com esse nome no código C# de
+`backend/Models/`; a §6 confere isso classe a classe.
+
+> Critérios atendidos: **B01** (modelo textual com ≥ 5 classes de domínio),
+> **B02/B03** (correspondência com o código, §6), **B04** (associação com
+> multiplicidade, §3), **B05** (composição, §4), **B06** (contrato polimórfico,
+> §5), **B07** (invariantes e responsáveis, §7).
+
+## 1. Classes selecionadas para avaliação
+
+As cinco classes de domínio centrais são **`Usuario`**, **`Produto`**
+(anúncio), **`Proposta`**, **`Pedido`** e **`ItemPedido`**. Completam o modelo
+`Categoria`, `Favorito`, o value object `DadosEntrega` e o contrato
+`IEstrategiaNegociacao` com suas três implementações.
+
+## 2. Diagrama
 
 ```mermaid
 classDiagram
@@ -12,8 +28,11 @@ classDiagram
         +string Email
         +string SenhaHash
         +bool Ativo
+        +bool Administrador
         +ValidarSenha(senha)$
-        +EhProprietario(id) bool
+        +EhProprietario(outroUsuarioId) bool
+        +AlterarSenha(senhaHash)
+        +Desativar()
     }
 
     class Produto {
@@ -22,18 +41,21 @@ classDiagram
         +string Nome
         +decimal Preco
         +int Estoque
+        +string Categoria
         +EstadoAnuncio Estado
         +ModalidadeNegociacao Modalidade
-        +ValidarPropriedade(id)
+        +int EstoqueMaximo$
+        +ValidarPropriedade(solicitanteId)
+        +ValidarExclusao(solicitanteId)
         +AplicarOperacao(operacao)
+        +Reservar()
+        +Vender()
+        +Pausar()
+        +Reativar()
+        +CancelarReserva()
+        +BaixarEstoque(quantidade)
+        +ReporEstoque(quantidade)
         +DefinirModalidade(modalidade)
-    }
-
-    class Categoria {
-        +int Id
-        +string Nome
-        +string Slug
-        +GerarSlug(nome)$ string
     }
 
     class Proposta {
@@ -45,6 +67,48 @@ classDiagram
         +Aceitar()
         +Recusar()
         +Cancelar()
+        +ValidarProponente(solicitanteId)
+    }
+
+    class Pedido {
+        +int Id
+        +string Codigo
+        +int CompradorId
+        +int VendedorId
+        +List~ItemPedido~ Itens
+        +decimal Total
+        +EstadoPedido Estado
+        +StatusPagamento StatusPagamento
+        +ConfirmarPagamento(agora)
+        +Enviar()
+        +Entregar()
+        +Concluir()
+        +CancelarPago(agora)
+        +ValidarComprador(solicitanteId)
+        +ValidarVendedor(solicitanteId)
+    }
+
+    class ItemPedido {
+        +int ProdutoId
+        +string NomeProduto
+        +decimal PrecoUnitario
+        +int Quantidade
+        +decimal Subtotal
+    }
+
+    class DadosEntrega {
+        <<value object>>
+        +string Cep
+        +string Cidade
+        +string Estado
+        +Criar(...)$ DadosEntrega
+    }
+
+    class Categoria {
+        +int Id
+        +string Nome
+        +string Slug
+        +GerarSlug(nome)$ string
     }
 
     class Favorito {
@@ -55,194 +119,134 @@ classDiagram
 
     class IEstrategiaNegociacao {
         <<interface>>
-        +Modalidade Modalidade
-        +ValorMinimo(preco) decimal
-        +Aceita(preco, oferta) bool
+        +ModalidadeNegociacao Modalidade
+        +ValorMinimo(precoAnuncio) decimal
+        +Aceita(precoAnuncio, valorOferta) bool
     }
 
-    Usuario "1" --> "0..*" Produto : possui
+    class EstrategiaPrecoFixo
+    class EstrategiaAceitaOferta
+    class EstrategiaLiquidacao
+
+    Usuario "1" --> "0..*" Produto : anuncia
     Usuario "1" --> "0..*" Proposta : propõe
-    Usuario "1" --> "0..*" Favorito : favorita
     Produto "1" --> "0..*" Proposta : recebe
-    Produto "1" --> "0..*" Favorito : é favoritado
-    Produto "1" --> "1" Categoria : pertence
+    Usuario "1" --> "0..*" Pedido : compra
+    Usuario "1" --> "0..*" Favorito : favorita
+    Produto "0..*" --> "1" Categoria : classificado em
+
+    Pedido "1" *-- "1..*" ItemPedido : compõe
+    Pedido "1" *-- "1" DadosEntrega : entrega
+    ItemPedido "0..*" ..> "1" Produto : snapshot de
 
     IEstrategiaNegociacao <|.. EstrategiaPrecoFixo
     IEstrategiaNegociacao <|.. EstrategiaAceitaOferta
     IEstrategiaNegociacao <|.. EstrategiaLiquidacao
+    Proposta ..> IEstrategiaNegociacao : aceite decidido por
 ```
 
-## 2. Responsabilidades
+## 3. Associações e multiplicidades (B04)
 
-### `Usuario`
-Representa a conta. Guarda apenas o **hash** da senha, nunca a senha.
-Invariantes: nome 3–120 caracteres; e-mail com formato válido e único;
-hash no formato `salt:hash`.
+| Associação | Multiplicidade | Implementação no código | Cenário que a testa |
+|---|---|---|---|
+| `Usuario` anuncia `Produto` | 1 → 0..* | `Produto.UsuarioId` (obrigatório: o construtor rejeita `proprietarioId <= 0`), índice `HasIndex(produto => produto.UsuarioId)` | `Criar_DeveVincularProprietario` |
+| `Produto` recebe `Proposta` | 1 → 0..* | `Proposta.ProdutoId`, índice em `RarityRoomContexto` | `Aceitar_DeveRecusarAsDemaisPendentes` (várias propostas, um anúncio) |
+| `Usuario` favorita `Produto` | 1 → 0..* (no máximo 1 por par) | índice **único** `(UsuarioId, ProdutoId)` | `ServicoFavoritosTests` (duplicado → 409) |
+| `Produto` classificado em `Categoria` | 0..* → 1 | `Produto.Categoria` guarda o nome canônico, validado contra o catálogo em `ServicoAnuncios` | `ServicoAnunciosCategoriaTests` |
 
-### `Produto` (anúncio)
-Raiz do agregado de venda. Concentra formação e ciclo de vida.
-Invariantes: dono válido; nome ≥ 3; preço > 0; estoque ≥ 0; categoria
-existente; imagem, se informada, é URL http(s); transições só pelo par
-(origem, operação).
+**Modelo conceitual × código.** As associações entre agregados são feitas por
+**identificador** (`UsuarioId`, `ProdutoId`), sem propriedades de navegação.
+Cada agregado é carregado e salvo pelo seu repositório, sem ciclos de objetos.
+Multiplicidade não expressa todas as regras: "o dono não propõe no próprio
+anúncio" (R4) não cabe no `1 → 0..*` e por isso é protegida por código
+(`ServicoPropostas.Criar`), não pelo diagrama.
 
-### `Categoria`
-Catálogo de categorias. O **slug** é a identidade semântica: normaliza
-acentos e caixa, então "Colecionáveis" e "colecionaveis" são a mesma
-categoria.
+## 4. Composição e ciclo de vida (B05)
 
-### `Proposta`
-Oferta de compra. Invariantes: valor > 0; estados `Pendente`, `Aceita`,
-`Recusada`, `Cancelada`; apenas `Pendente` transiciona; somente o proponente
-cancela.
+`Pedido *-- ItemPedido` é **composição**, e não apenas associação:
 
-### `Favorito`
-Vínculo usuário↔anúncio. Invariante: o dono do anúncio não pode favoritá-lo;
-não há duplicata por par (usuário, anúncio).
+| Evidência | Onde |
+|---|---|
+| Os itens só nascem dentro do construtor do pedido, que exige pelo menos 1 (`"Não é possível criar um pedido vazio."`) e proíbe repetir anúncio | `Pedido(compradorId, vendedorId, itens, entrega, forma, pagamentoId)` |
+| O EF mapeia os itens como **entidade possuída**: sem `DbSet` próprio, gravados e apagados junto com o pedido | `entidade.OwnsMany(pedido => pedido.Itens, ...)` com `WithOwner().HasForeignKey("PedidoId")` em `RarityRoomContexto` |
+| O item não muda depois de criado: guarda **snapshot** de nome e preço, independente do anúncio | `ItemPedido.NomeProduto`, `PrecoUnitario`; teste `Snapshot_NaoMudaQuandoOAnuncioMuda` |
+| `Total` é derivado dos itens no momento da criação | `Total = lista.Sum(item => item.Subtotal)` |
 
-### `IEstrategiaNegociacao`
-Contrato de decisão sobre ofertas. Três implementações com regras distintas:
+`Pedido *-- DadosEntrega` também é composição (value object `OwnsOne`, colunas
+`Entrega*` na própria tabela `pedidos`). Já `ItemPedido ..> Produto` é só uma
+**dependência**: o item copia dados do anúncio, e excluir ou editar o anúncio
+não afeta o histórico.
 
-| Implementação | Aceita a partir de | Intenção |
-|---|---|---|
-| `EstrategiaPrecoFixo` | 100% do preço | não negocia |
-| `EstrategiaAceitaOferta` | 85% do preço | negocia com margem |
-| `EstrategiaLiquidacao` | 70% do preço | desova estoque |
-
-## 3. Herança
-
-A única relação de especialização é `TransicaoInvalidaException` herdando de
-`ConflitoException`: a especialização acrescenta um **código** próprio
-(`transicao-invalida`) e permite ao middleware mapear o mesmo status 409 com
-identidade distinta. Não há herança usada apenas para reutilizar código.
-
-## 4. Colaboração entre objetos
+## 5. Contrato polimórfico (B06)
 
 ```
-Controller → Serviço → Domínio → Repositório
+IEstrategiaNegociacao
+  ├─ EstrategiaPrecoFixo     Aceita se oferta ≥ 100% do preço
+  ├─ EstrategiaAceitaOferta  Aceita se oferta ≥ 85% do preço
+  └─ EstrategiaLiquidacao    Aceita se oferta ≥ 70% do preço
 ```
 
-A decisão nunca fica no controller. Exemplo real de colaboração no aceite de
-uma proposta:
+As três classes ficam em `backend/Models/Negociacao/` e são registradas na
+injeção de dependência. `ServicoPropostas.Aceitar` escolhe a estratégia pela
+`Modalidade` do anúncio e chama apenas `Aceita(...)`, sem `if`/`switch` por
+tipo. Teste que comprova o comportamento diferente para a mesma entrada:
+`OfertaDe200EmPrecoDe249_90_DeveVariarPorModalidade`.
 
-1. `ServicoPropostas` busca `Proposta` e `Produto`;
-2. `Produto.ValidarPropriedade` autoriza;
-3. `IEstrategiaNegociacao.Aceita` decide pelo preço e pela modalidade;
-4. `Proposta.Aceitar` e `Produto.Reservar` mudam estado;
-5. `RecusarDemaisPendentes` fecha as outras ofertas.
+## 6. Correspondência modelo × código (B02/B03)
 
-## 5. Separação de camadas
+Conferido membro a membro com `grep` sobre `backend/Models` em 2026-11-18:
+
+| Classe | Arquivo | Atributos conferidos | Métodos conferidos |
+|---|---|---|---|
+| `Usuario` | `Models/Usuario.cs` | `Id`, `Nome`, `Email`, `SenhaHash`, `Ativo`, `Administrador` | `ValidarSenha` (static), `EhProprietario`, `AlterarSenha`, `Desativar` |
+| `Produto` | `Models/Produto.cs` | `Id`, `UsuarioId`, `Nome`, `Preco`, `Estoque`, `Categoria`, `Estado`, `Modalidade`, `EstoqueMaximo` (const) | `ValidarPropriedade`, `ValidarExclusao`, `AplicarOperacao`, `Reservar`, `Vender`, `Pausar`, `Reativar`, `CancelarReserva`, `BaixarEstoque`, `ReporEstoque`, `DefinirModalidade` |
+| `Proposta` | `Models/Proposta.cs` | `Id`, `ProdutoId`, `ProponenteId`, `Valor`, `Estado` | `Aceitar`, `Recusar`, `Cancelar`, `ValidarProponente` |
+| `Pedido` | `Models/Pedido.cs` | `Id`, `Codigo`, `CompradorId`, `VendedorId`, `Itens`, `Total`, `Estado`, `StatusPagamento` | `ConfirmarPagamento`, `Enviar`, `Entregar`, `Concluir`, `CancelarPago`, `ValidarComprador`, `ValidarVendedor` |
+| `ItemPedido` | `Models/ItemPedido.cs` | `ProdutoId`, `NomeProduto`, `PrecoUnitario`, `Quantidade`, `Subtotal` | — (imutável depois de criado) |
+
+Os atributos de todas as classes têm `set` privado. Toda mutação passa por um
+método da própria entidade.
+
+## 7. Invariantes e objeto responsável (B07)
+
+| Invariante | Objeto responsável | Como é protegida | Teste |
+|---|---|---|---|
+| Estoque sempre entre 0 e `EstoqueMaximo` (100.000) | `Produto` | `EstoqueValido` no construtor e em `Atualizar`; `BaixarEstoque` recusa quantidade acima do disponível; `ReporEstoque` soma em `long` e limita ao teto | `BaixarEstoque_AcimaDoDisponivel_DeveFalharSemAlterar`, `ReporEstoque_NoTeto_NaoEstouraNemFicaNegativo` |
+| Estado só muda por par (origem, operação) permitido | `Produto` | dicionário privado `Transicoes`; `AplicarOperacao` lança `TransicaoInvalidaException` antes de alterar qualquer campo | `CancelarReserva_DePausado_DeveFalhar` |
+| Anúncio sempre tem dono | `Produto` | construtor rejeita `proprietarioId <= 0`; `UsuarioId` sem setter público | `ProdutoPropriedadeTests` |
+| Pedido tem ≥ 1 item, sem anúncio repetido, e comprador ≠ vendedor | `Pedido` | validação no construtor, antes de atribuir os campos | `Construtor_SemItens_DeveFalhar`, `Construtor_NoProprioAnuncio_DeveFalhar` |
+| Proposta só transiciona a partir de `Pendente` | `Proposta` | `Aceitar`/`Recusar`/`Cancelar` verificam o estado atual | `Aceitar_PropostaJaAceita_DeveFalhar` |
+
+**Invariante que ultrapassa uma instância:** "ao aceitar uma proposta, nenhuma
+outra proposta pendente do mesmo anúncio continua aberta" envolve várias
+`Proposta`. Por isso o responsável é `ServicoPropostas`
+(`RecusarDemaisPendentes`), que coordena o agregado inteiro na mesma unidade de
+trabalho. Teste: `Aceitar_DeveRecusarAsDemaisPendentes`.
+
+## 8. Responsabilidades e camadas
 
 | Camada | Responsabilidade | Não faz |
 |---|---|---|
 | `Controller` | traduzir HTTP ↔ domínio | regra de negócio |
-| `Services` | orquestrar e autorizar | formatar resposta |
-| `Models` | invariantes e estados | conhecer HTTP |
-| `Repositories` | persistir e gerar id | decidir regra |
+| `Services` | orquestrar agregados, transação, regras entre instâncias | formatar resposta HTTP |
+| `Models` | invariantes, estados e regras de uma instância | conhecer HTTP ou banco |
+| `Repositories` | persistir (EF Core + SQLite) | decidir regra |
 | `Middleware` | traduzir exceção em ProblemDetails | conhecer regra específica |
 
-## 6. Módulos da compra (Onda 4)
+**Colaboração no aceite de proposta (FL-02):**
 
-```mermaid
-classDiagram
-    direction LR
+1. `ServicoPropostas` carrega `Proposta` e `Produto`;
+2. `Produto.ValidarPropriedade` autoriza o dono (R1);
+3. a `IEstrategiaNegociacao` da modalidade decide pelo valor (R3);
+4. `Proposta.Aceitar` e `Produto.Reservar` mudam de estado (R2);
+5. `RecusarDemaisPendentes` fecha as outras ofertas.
 
-    class Pedido {
-        +int Id
-        +int ProdutoId
-        +int CompradorId
-        +int VendedorId
-        +string NomeProduto
-        +decimal PrecoUnitario
-        +EstadoPedido Estado
-        +Concluir()
-        +Cancelar()
-        +ValidarVendedor(id)
-    }
+**Herança:** a única especialização de classe é na hierarquia de exceções
+(`TransicaoInvalidaException` e `PagamentoRecusadoException`, ambas
+`: ConflitoException : ExcecaoDominio`). Cada especialização acrescenta um
+código próprio (ex.: `transicao-invalida`) com o mesmo status 409. O
+polimorfismo de negócio usa **interface**, não herança.
 
-    class Avaliacao {
-        +int Id
-        +int PedidoId
-        +int AutorId
-        +int VendedorId
-        +int Nota
-        +string Comentario
-    }
-
-    class ReputacaoVendedor {
-        +decimal Media
-        +int Total
-    }
-
-    Pedido "1" --> "0..1" Avaliacao : gera
-    Avaliacao --> ReputacaoVendedor : agrega
-```
-
-### `Pedido`
-Fecha o ciclo de compra. Guarda **snapshot** de `NomeProduto` e `PrecoUnitario`:
-editar o anúncio depois não reescreve o histórico. Invariantes: não comprar o
-próprio anúncio; anúncio precisa estar `Disponivel`; só o vendedor conclui;
-apenas `Pendente` transiciona.
-
-### `Avaliacao`
-Nota de 1 a 5 do comprador sobre o vendedor. Invariantes: só existe para pedido
-`Concluido`, só o comprador avalia e há no máximo uma por pedido — regra
-reforçada por índice único no banco.
-
-### `ReputacaoVendedor`
-Valor derivado: média com duas casas e total de avaliações. Vendedor sem
-avaliação responde `0 / 0`, nunca erro.
-
-### Upload de imagem
-`ServicoImagensArquivo` grava em `wwwroot/uploads` com nome gerado
-(`Guid`), validando tamanho (2 MB) e tipo declarado. O nome original enviado
-pelo cliente é descartado — o que elimina path traversal e extensão forjada.
-
-## 7. Comprador, vendedor e checkout
-
-```mermaid
-classDiagram
-    direction LR
-
-    class Usuario {
-        +TipoConta TipoConta
-        +bool PodeComprar
-        +bool PodeVender
-    }
-
-    class Pedido {
-        +DadosEntrega Entrega
-        +FormaPagamento FormaPagamento
-        +decimal PrecoUnitario
-    }
-
-    class DadosEntrega {
-        +string Cep
-        +string Logradouro
-        +string Numero
-        +string Complemento
-        +string Bairro
-        +string Cidade
-        +string Estado
-        +Criar() DadosEntrega
-    }
-
-    Usuario "1" --> "0..*" Pedido : compra
-    Pedido *-- DadosEntrega : snapshot
-```
-
-### `TipoConta`
-Papel escolhido no cadastro: `Comprador`, `Vendedor` ou `Ambos`. Duas derivações
-governam o acesso: `PodeComprar` e `PodeVender`. Contas anteriores à mudança
-foram migradas como `Ambos`, preservando o que já funcionava.
-
-### `DadosEntrega`
-Value object do checkout. `Criar` valida CEP (8 dígitos, formatado como
-`00000-000`), logradouro, número, bairro, cidade e UF (duas letras). Fica
-gravado no pedido — mudar o cadastro depois não altera compras antigas.
-
-### `FormaPagamento`
-`Pix`, `CartaoCredito` ou `Boleto`, validado por `Enum.IsDefined`.
-
-### Regra de papel
-`ServicoAnuncios.Criar` exige `PodeVender`; `ServicoPedidos.Criar` exige
-`PodeComprar`. A autorização é do domínio, não do controller.
+**Conta única:** `Usuario.TipoConta` continua no modelo de dados por
+compatibilidade com contas antigas. Toda conta nova nasce `Ambos`, e nenhum
+serviço restringe compra ou venda por esse campo (RC-09).

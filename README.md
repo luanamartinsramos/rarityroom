@@ -10,13 +10,30 @@ O projeto possui um **frontend desenvolvido em React + TypeScript** e um
 repositório (monorepo).
 
 
-# 👥 Alunos
+## Integrantes
 
 - Luana Martins Ramos - 06014936
 - Jeorgia Luiza da Rosa Canto - 06014796
 - Pedro Henrique Canto da Silva - 06013162
 - Lucas Ribeiro Dias - 06015364
 - Miguel Souza dos Santos - 06014237
+
+## 📚 Documentação da AV2
+
+Toda a evidência técnica da AV2 está em [`docs/av2/`](docs/av2/), com índice
+por critério (A01–G02) em [`docs/av2/evidencias.json`](docs/av2/evidencias.json)
+e a correspondência completa em [`docs/av2/auditoria-final.md`](docs/av2/auditoria-final.md).
+
+| Documento | Critérios |
+|---|---|
+| [`requisitos.md`](docs/av2/requisitos.md) — 3 fluxos, 5 regras centrais, estados e critérios de aceitação | A03, A05, G01 |
+| [`modelo-de-classes.md`](docs/av2/modelo-de-classes.md) — diagrama Mermaid, multiplicidades, composição, invariantes | B01–B07 |
+| [`decisoes-de-modelagem.md`](docs/av2/decisoes-de-modelagem.md) — alternativas comparadas | B08 |
+| [`code-review.md`](docs/av2/code-review.md) — revisão do commit `78cae8b` | C01–C06 |
+| [`excecoes.md`](docs/av2/excecoes.md) — três situações de falha | D01–D04 |
+| [`debugging.md`](docs/av2/debugging.md) — defeito DEF-01 reproduzido, investigado e corrigido | E01–E06 |
+| [`testes.md`](docs/av2/testes.md) — testes e matriz de rastreabilidade | F01–F05 |
+| [`especificacao-dscode.md`](docs/av2/especificacao-dscode.md) — especificação para o agente | G02 |
 
 ---
 
@@ -227,7 +244,7 @@ cd tests/RarityRoom.Tests
 dotnet test
 ```
 
-Resultado esperado: **241 testes aprovados, 0 falhas**. A suíte
+Resultado esperado: **245 testes aprovados, 0 falhas**. A suíte
 `Api/MarketplaceApiTests.cs` cobre, pela API HTTP real, pesquisa, as 7
 ordenações, carrinho e limites de estoque, checkout, PIX/boleto/cartão
 simulados, cancelamento, expiração, compras simultâneas do mesmo estoque,

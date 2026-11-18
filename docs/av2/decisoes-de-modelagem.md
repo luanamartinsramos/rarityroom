@@ -1,7 +1,107 @@
 # Decisões de modelagem
 
-Registro das decisões que moldaram o domínio, no formato
-contexto → decisão → consequência.
+> Critério **B08**: as decisões **DM-A** e **DM-B** comparam alternativas com
+> critérios explícitos e justificam a escolha com elementos concretos da
+> implementação. As decisões D1–D16, mais abaixo, são o registro histórico no
+> formato contexto → decisão → consequência.
+
+---
+
+## DM-A — Como representar o ciclo de vida do anúncio
+
+**Problema.** `Produto` passa por quatro situações: disponível, reservado por
+uma proposta aceita, pausado pelo dono e vendido. Algumas mudanças são
+proibidas (ex.: vender um anúncio pausado; cancelar reserva de algo que não
+está reservado). Os critérios A05 e A06 exigem estados significativos, com
+transições permitidas e rejeição das proibidas sem estado inconsistente.
+
+**Alternativas consideradas**
+
+| | A1 — Booleanos (`Vendido`, `Pausado`, `Reservado`) | A2 — Enum + `if`/`switch` em cada método | **A3 — Enum `EstadoAnuncio` + tabela de transições (origem, operação) → destino** | A4 — Padrão State (uma classe por estado) |
+|---|---|---|---|---|
+| Estados impossíveis | possíveis (`Vendido && Pausado`) | impossíveis | impossíveis | impossíveis |
+| Onde ficam as transições | espalhadas | espalhadas em 5 métodos | **um único dicionário** (`Produto.Transicoes`) | espalhadas em 4 classes |
+| Rejeição de transição proibida | cada método precisa lembrar | cada método precisa lembrar | **uma verificação** em `AplicarOperacao` | cada classe implementa |
+| Persistência (EF Core) | 3 colunas | 1 coluna | **1 coluna** (`Estado` como texto) | exige conversão objeto ↔ coluna |
+| Custo para um estado novo | alto | médio | **uma linha por transição** | uma classe nova |
+| Comportamento por estado | nenhum | nenhum | nenhum (estados só restringem operações) | justificaria a classe |
+
+**Escolha: A3.** Os estados do anúncio **não têm comportamento próprio**: só
+mudam quais operações são válidas. Isso tira a principal vantagem do padrão
+State (A4), que seria herança sem variação real de comportamento (Cap. 11,
+"Herança precisa de variação real"). Os booleanos (A1) permitem combinações
+inválidas que nenhum construtor impede. A3 concentra a regra R2 num só lugar:
+
+```csharp
+// backend/Models/Produto.cs
+private static readonly Dictionary<(EstadoAnuncio Origem, OperacaoAnuncio Operacao), EstadoAnuncio> Transicoes = new()
+{
+    [(EstadoAnuncio.Disponivel, OperacaoAnuncio.Reservar)] = EstadoAnuncio.Reservado,
+    ...
+};
+
+public void AplicarOperacao(OperacaoAnuncio operacao)
+{
+    if (!Transicoes.TryGetValue((Estado, operacao), out EstadoAnuncio destino))
+        throw new TransicaoInvalidaException(...);   // nada foi alterado ainda
+    ...
+    Estado = destino;
+}
+```
+
+A chave é o **par** (origem, operação), e não só o destino, por causa de um
+defeito real registrado em `debugging.md` (Caso 3): duas operações com o
+mesmo destino `Disponivel` (`Reativar` e `CancelarReserva`) colidiam.
+`Reativar_DeReservado_NaoDeveCancelarReserva` impede a regressão.
+
+**Custo aceito.** A baixa e a reposição de estoque (`BaixarEstoque`,
+`ReporEstoque`) também movem o estado (estoque 0 → `Vendido`) sem passar pela
+tabela. A revisão do commit `78cae8b` ([`code-review.md`](code-review.md))
+discute esse ponto.
+
+---
+
+## DM-B — Como variar a decisão de aceitar uma proposta
+
+**Problema.** A mesma oferta pode ser aceitável ou não conforme a modalidade
+do anúncio: preço fixo (sem desconto), aceita oferta (até 15%) ou liquidação
+(até 30%). A regra R3 precisa ser aplicada no backend, e a modalidade pode
+mudar depois que o anúncio é criado (`Produto.DefinirModalidade`).
+
+**Alternativas consideradas**
+
+| | B1 — `switch (modalidade)` dentro de `ServicoPropostas` | B2 — Herança: `ProdutoPrecoFixo`, `ProdutoLiquidacao`... | **B3 — Strategy: `IEstrategiaNegociacao` + 3 implementações injetadas** |
+|---|---|---|---|
+| Nova modalidade | edita o serviço (aberto à modificação) | nova subclasse + migração de tabela (TPH/TPT) | **nova classe + 1 linha de registro na injeção** |
+| Mudar a modalidade de um anúncio existente | trivial | **impossível sem trocar o tipo do objeto** (identidade muda) | trivial: só o enum muda |
+| Teste da regra isolada | só testando o serviço inteiro | precisa instanciar o anúncio completo | **cada estratégia testada sozinha** (`EstrategiasTests`) |
+| Acoplamento de `Produto` com negociação | baixo | alto (o anúncio "é" uma modalidade) | baixo: `Produto` só guarda o enum |
+| Persistência | 1 coluna | discriminador + hierarquia no EF | 1 coluna (`Modalidade`) |
+
+**Escolha: B3.** O fator decisivo é que a modalidade é **mutável**. Com
+herança (B2), trocar "preço fixo" por "liquidação" exigiria destruir o objeto
+e criar outro, o que quebra a identidade do anúncio e as propostas e
+favoritos ligados ao `Id`. Com o `switch` (B1), cada modalidade nova
+reabriria o serviço. Na implementação:
+
+```csharp
+// backend/Program.cs
+builder.Services.AddSingleton<IEstrategiaNegociacao, EstrategiaPrecoFixo>();
+builder.Services.AddSingleton<IEstrategiaNegociacao, EstrategiaAceitaOferta>();
+builder.Services.AddSingleton<IEstrategiaNegociacao, EstrategiaLiquidacao>();
+
+// backend/Services/ServicoPropostas.cs — recebe IEnumerable<IEstrategiaNegociacao>,
+// indexa por Modalidade e chama apenas estrategia.Aceita(preco, oferta).
+```
+
+**Verificação.** As três implementações são usadas de fato:
+`Aceitar_MesmaOferta_DeveVariarPorModalidade` envia a mesma oferta de R$ 200
+para anúncios de R$ 249,90 e obtém `409` em `PrecoFixo` e `200` em
+`Liquidacao`.
+
+**Custo aceito.** Uma classe a mais por modalidade, e o registro na injeção
+precisa ficar sincronizado com o enum. `ObterEstrategia` lança exceção se
+faltar uma estratégia, então o esquecimento aparece já no primeiro uso.
 
 ---
 
