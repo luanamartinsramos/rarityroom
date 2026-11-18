@@ -129,11 +129,16 @@ caminho indicado. O índice legível por máquina é
 
 ## Prova de clone limpo (F04)
 
-```
-git clone <repositório> && cd rarityroom
-dotnet build backend                → 0 Aviso(s), 0 Erro(s)
-dotnet test tests/RarityRoom.Tests  → Aprovado: 245, Com falha: 0
-```
+Executada em 2026-11-18 sobre o commit `5c9a1a0`, num diretório temporário
+vazio (o clone não traz `bin/`, `obj/` nem `rarityroom.db`):
 
-Resultado registrado no commit que introduziu esta auditoria. O clone foi
-feito em diretório temporário, sem `bin/`, `obj/` nem banco local.
+```
+$ git clone <repositório> clone-limpo && cd clone-limpo
+$ git log --oneline -1
+5c9a1a0 docs(av2): documentação alinhada aos 40 itens do enunciado
+$ dotnet build backend
+    0 Aviso(s)
+    0 Erro(s)
+$ dotnet test tests/RarityRoom.Tests
+Aprovado!  – Com falha: 0, Aprovado: 245, Ignorado: 0, Total: 245
+```
